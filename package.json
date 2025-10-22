@@ -1,0 +1,30 @@
+{
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "chartjs-plugin-zoom": "^2.2.0",
+    "graphjs": "^0.0.4",
+    "react": "^19.2.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^19.2.0"
+  },
+  "scripts": {
+    "start": "react-scripts start"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "react-scripts": "^5.0.1"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
