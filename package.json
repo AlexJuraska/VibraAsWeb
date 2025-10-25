@@ -1,19 +1,29 @@
 {
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.4",
+    "@mui/material": "^7.3.4",
     "chart.js": "^4.5.1",
     "chartjs-plugin-zoom": "^2.2.0",
     "graphjs": "^0.0.4",
     "react": "^19.2.0",
     "react-chartjs-2": "^5.3.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.4"
   },
   "scripts": {
-    "start": "react-scripts start"
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "react-scripts": "^5.0.1"
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12"
   },
   "browserslist": {
     "production": [
