@@ -1,0 +1,16 @@
+{
+  "layout": "GridLayout",
+  "zones": {
+    "leftPanel": { "component": "ColorBlock", "props": { "color": "Red" } },
+    "mainContent": { "component": "ColorBlock", "props": { "color": "Blue" } },
+    "bottomPanel": { "component": "ColorBlock", "props": { "color": "Green" } }
+  },
+  "grid": {
+    "areas": [
+      ["mainContent", "mainContent"],
+      ["mainContent", "mainContent"]
+    ],
+    "columns": ["2fr", "8fr"],
+    "rows": ["8fr", "2fr"]
+  }
+}
