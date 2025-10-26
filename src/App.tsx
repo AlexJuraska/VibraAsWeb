@@ -11,7 +11,7 @@ const LayoutTest = lazy(() => import("./experiments/layoutTest"));
 function App() {
     return (
         <Box display="flex" flexDirection="column" minHeight="100vh">
-            <Box flex={1} p={2}>
+            <Box flex={1}>
                 <Suspense fallback={<CircularProgress />}>
                     <Routes>
                         <Route path="/" element={<Home />} />

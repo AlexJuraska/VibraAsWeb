@@ -1,16 +1,41 @@
 {
   "layout": "GridLayout",
   "zones": {
-    "leftPanel": { "component": "ColorBlock", "props": { "color": "Red" } },
-    "mainContent": { "component": "ColorBlock", "props": { "color": "Blue" } },
-    "bottomPanel": { "component": "ColorBlock", "props": { "color": "Green" } }
+    "CollapsiblePanel": {
+      "component": "CollapsiblePanel",
+      "props": {
+        "collapsed": true,
+        "children": [
+          { "component": "ColorBlock", "props": { "color": "purple", "label": "One" } },
+          { "component": "ColorBlock", "props": { "color": "gray", "label": "Two" } }
+        ]
+      }
+    },
+    "mainContent": {
+      "component": "ColorBlock",
+      "props": { "color": "blue", "label": "Main Content" }
+    },
+    "leftPanel": {
+      "component": "ColorBlock",
+      "props": { "color": "orange", "label": "Left Info Panel" }
+    },
+    "bottomPanel": {
+      "component": "ColorBlock",
+      "props": { "color": "green", "label": "Bottom Info Panel" }
+    }
   },
   "grid": {
-    "areas": [
-      ["mainContent", "mainContent"],
-      ["mainContent", "mainContent"]
-    ],
-    "columns": ["2fr", "8fr"],
-    "rows": ["8fr", "2fr"]
+    "xs": {
+      "areas": [["CollapsiblePanel" ,"mainContent"],
+                ["CollapsiblePanel" ,"bottomPanel"]],
+      "columns": ["55px","1fr"],
+      "rows": ["8fr", "1fr"]
+    },
+    "md": {
+      "areas": [["leftPanel", "mainContent"],
+                ["leftPanel", "bottomPanel"]],
+      "columns": ["2fr", "8fr"],
+      "rows": ["8fr", "1fr"]
+    }
   }
 }
