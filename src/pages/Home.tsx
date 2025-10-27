@@ -6,7 +6,7 @@ function Home() {
 
     const experiments = [
         { title: "Chladni's Patterns", path: "/experiments/chladniPatterns" },
-        { title: "Tralalero Tralala", path: "/experiments/tralaleroTralala" },
+        { title: "Layout Test", path: "/experiments/layoutTest" },
     ];
 
     return (
