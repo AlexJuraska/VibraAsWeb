@@ -1,7 +1,12 @@
 import React from "react";
+import { componentRegistry } from "../componentRegistry";
 import {Box, useMediaQuery, useTheme} from "@mui/material";
 import { LayoutConfig } from "../types/LayoutConfig";
 import * as AppComponents from "../../components";
+
+function resolveComponent(name: string) {
+    return componentRegistry[name];
+}
 
 export const GridLayout: React.FC<{ config: LayoutConfig }> = ({ config }) => {
     const { zones, grid } = config;
@@ -38,7 +43,7 @@ export const GridLayout: React.FC<{ config: LayoutConfig }> = ({ config }) => {
             return null;
         }
 
-        const Component = (AppComponents as any)[zone.component];
+        const Component = resolveComponent(zone.component);
         if (!Component) {
             console.warn(`Component '${zone.component}' not found.`);
             return null;

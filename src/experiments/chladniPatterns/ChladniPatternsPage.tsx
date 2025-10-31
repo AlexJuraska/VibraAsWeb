@@ -1,9 +1,12 @@
-import {Box, Typography} from "@mui/material";
+import React from "react";
+import {LayoutRenderer} from "../../layout-system/LayoutRenderer";
+import type { LayoutConfig } from "../../layout-system/types/LayoutConfig";
+import layout from "../../configs/chladniPatternsLayout.json";
 
-export default function ExperimentPage() {
+export function ChladniPatternsPage() {
     return (
-        <Box display="flex" flexDirection="column" gap={4}>
-            <Typography variant="h5" component="div">Chladnis patterns page</Typography>
-        </Box>
+        <LayoutRenderer
+            config={layout as LayoutConfig}
+        />
     );
 }
