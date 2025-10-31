@@ -12,12 +12,10 @@
       }
     },
     "mainContent": {
-      "component": "ColorBlock",
-      "props": { "color": "blue", "label": "Main Content" }
+      "component": "OscillogramGraph", "props": { "style": { "width": "100%", "height": "100%" } }
     },
     "leftPanel": {
-      "component": "ColorBlock",
-      "props": { "color": "orange", "label": "Left Info Panel" }
+      "component": "ToneController", "props": { "label": "Chladni Tone" }
     },
     "bottomPanel": {
       "component": "ColorBlock",
@@ -26,14 +24,18 @@
   },
   "grid": {
     "xs": {
-      "areas": [["CollapsiblePanel" ,"mainContent"],
-                ["CollapsiblePanel" ,"bottomPanel"]],
-      "columns": ["55px","1fr"],
+      "areas": [
+        ["CollapsiblePanel", "mainContent"],
+        ["CollapsiblePanel", "bottomPanel"]
+      ],
+      "columns": ["55px", "1fr"],
       "rows": ["8fr", "1fr"]
     },
     "md": {
-      "areas": [["leftPanel", "mainContent"],
-                ["leftPanel", "bottomPanel"]],
+      "areas": [
+        ["leftPanel", "mainContent"],
+        ["leftPanel", "bottomPanel"]
+      ],
       "columns": ["2fr", "8fr"],
       "rows": ["8fr", "1fr"]
     }
