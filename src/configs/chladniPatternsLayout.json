@@ -37,7 +37,7 @@
         ["leftPanel", "bottomPanel"]
       ],
       "columns": ["2fr", "8fr"],
-      "rows": ["8fr", "1fr"]
+      "rows": ["8fr", "1.5fr"]
     }
   }
 }
