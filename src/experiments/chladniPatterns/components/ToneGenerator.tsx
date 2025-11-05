@@ -4,6 +4,7 @@ import FrequencySlider from "./FrequencySlider";
 import { frequencyToOscillogramData } from "./SoundToGraphConvertor";
 import type { ChartDataProps } from "../../../components/Graph";
 import {play, pause} from "../state/startStopBus";
+import Button from "@mui/material/Button";
 
 type Props = {
     frequency?: number;
@@ -150,7 +151,11 @@ const ToneGenerator: React.FC<Props> = ({
                 format={(v) => `${Math.round(v)} Hz`}
             />
 
-            <button id={"startStopBtn"} onClick={running ? stop : start}>Sound</button>
+            <Button id="startStopBtn"
+                    variant="contained"
+                    color={running ? "error" : "primary"}
+                    onClick={running ? stop : start}
+            >{running ? "Stop Sound" : "Start Sound"}</Button>
         </div>
     );
 };
