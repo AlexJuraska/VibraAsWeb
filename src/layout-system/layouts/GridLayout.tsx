@@ -2,9 +2,10 @@ import React from "react";
 import {Box, useMediaQuery, useTheme} from "@mui/material";
 import { LayoutConfig } from "../types/LayoutConfig";
 import * as GenericComponents from "../../components";
-import * as ExperimentComponents from "../../experiments/chladniPatterns/components";
+import * as ChladniComponents from "../../experiments/chladniPatterns/components";
+import ColorBlock from "../../components/ColorBlock";
 
-const AppComponents = { ...GenericComponents, ...ExperimentComponents };
+const AppComponents = { ...GenericComponents, ...ChladniComponents, ColorBlock };
 
 export const GridLayout: React.FC<{ config: LayoutConfig }> = ({ config }) => {
     const { zones, grid } = config;

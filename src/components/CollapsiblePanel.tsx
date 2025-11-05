@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { IconButton, Drawer, useMediaQuery, useTheme } from "@mui/material";
 import { Menu as MenuIcon, ChevronLeft } from "@mui/icons-material";
-import * as AppComponents from "../components";
+import * as ChladniComponents from "../experiments/chladniPatterns/components";
+import ColorBlock from "./ColorBlock";
+
+const AppComponents = { ...ChladniComponents, ColorBlock };
 
 interface CollapsiblePanelProps {
     collapsed?: boolean;
