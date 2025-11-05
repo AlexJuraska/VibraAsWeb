@@ -1,4 +1,4 @@
-
+// src/experiments/chladniPatterns/components/ToneGenerator.tsx
 import React from "react";
 import FrequencySlider from "./FrequencySlider";
 import { frequencyToOscillogramData } from "./SoundToGraphConvertor";
@@ -108,9 +108,9 @@ const ToneGenerator: React.FC<Props> = ({
             const now = ctx.currentTime;
             osc.frequency.cancelScheduledValues(now);
             osc.frequency.linearRampToValueAtTime(frequency, now + 0.015);
-            if (running) emitOscillogram(frequency);
+            emitOscillogram(frequency);
         }
-    }, [frequency, running, emitOscillogram]);
+    }, [frequency, emitOscillogram]);
 
     const onFreqChange = (next: number) => {
         setFreq(next);
