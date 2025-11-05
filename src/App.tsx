@@ -6,7 +6,6 @@ import { Box, CircularProgress } from "@mui/material";
 import NotFound from "./pages/NotFound";
 
 const ChladniExp = lazy(() => import("./experiments/chladniPatterns"));
-const LayoutTest = lazy(() => import("./experiments/layoutTest"));
 const GraphTest = lazy(() => import("./components/graphTest"));
 
 function App() {
@@ -18,9 +17,7 @@ function App() {
                         <Route path="/" element={<Home />} />
 
                         <Route path="/experiments/chladniPatterns" element={<ChladniExp />} />
-                        <Route path="/experiments/layoutTest" element={<LayoutTest/>} />
                         <Route path="/components/graphTest" element={<GraphTest/>} />
-
                         <Route path="/404" element={<NotFound />} />
                         <Route path="*" element={<Navigate to="/404" />} />
                     </Routes>

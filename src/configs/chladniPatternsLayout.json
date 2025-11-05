@@ -15,7 +15,13 @@
       "component": "OscillogramGraph", "props": { "style": { "width": "100%", "height": "100%" } }
     },
     "leftPanel": {
-      "component": "ToneController", "props": { "label": "Chladni Tone" }
+      "component": "BasicPanel",
+      "props": {
+        "children": [
+          { "component": "ToneController", "props": { "label": "Chladni Tone" } },
+          { "component": "ColorBlock", "props": { "color": "grey", "label": "Test" } }
+        ]
+      }
     },
     "bottomPanel": {
       "component": "ColorBlock",
@@ -37,7 +43,7 @@
         ["leftPanel", "bottomPanel"]
       ],
       "columns": ["2fr", "8fr"],
-      "rows": ["8fr", "1fr"]
+      "rows": ["8fr", "1.5fr"]
     }
   }
 }
