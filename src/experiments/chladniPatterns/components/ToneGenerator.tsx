@@ -1,10 +1,10 @@
-// src/experiments/chladniPatterns/components/ToneGenerator.tsx
 import React from "react";
 import FrequencySlider from "./FrequencySlider";
 import { frequencyToOscillogramData } from "./SoundToGraphConvertor";
 import type { ChartDataProps } from "../../../components/Graph";
-import {play, pause} from "../state/startStopBus";
+import { play, pause } from "../state/startStopBus";
 import Button from "@mui/material/Button";
+import {Box} from "@mui/material";
 
 type Props = {
     frequency?: number;
@@ -29,7 +29,7 @@ const ToneGenerator: React.FC<Props> = ({
                                             step = 1,
                                             onStart,
                                             onStop,
-                                            onOscillogram
+                                            onOscillogram,
                                         }) => {
     const audioCtxRef = React.useRef<AudioContext | null>(null);
     const oscRef = React.useRef<OscillatorNode | null>(null);
@@ -49,10 +49,13 @@ const ToneGenerator: React.FC<Props> = ({
         return ctx;
     }, []);
 
-    const emitOscillogram = React.useCallback((f: number) => {
-        const data = frequencyToOscillogramData(f);
-        onOscillogram?.(data);
-    }, [onOscillogram]);
+    const emitOscillogram = React.useCallback(
+        (f: number) => {
+            const data = frequencyToOscillogramData(f);
+            onOscillogram?.(data);
+        },
+        [onOscillogram]
+    );
 
     const start = React.useCallback(async () => {
         if (oscRef.current) return;
@@ -89,8 +92,13 @@ const ToneGenerator: React.FC<Props> = ({
         g.gain.setTargetAtTime(0, now, 0.02);
 
         const to = setTimeout(() => {
-            try { osc.stop(); } catch {}
-            try { osc.disconnect(); g.disconnect(); } catch {}
+            try {
+                osc.stop();
+            } catch {}
+            try {
+                osc.disconnect();
+                g.disconnect();
+            } catch {}
             oscRef.current = null;
             gainRef.current = null;
             setRunning(false);
@@ -126,7 +134,9 @@ const ToneGenerator: React.FC<Props> = ({
 
     React.useEffect(() => {
         return () => {
-            try { stop(); } catch {}
+            try {
+                stop();
+            } catch {}
             const ctx = audioCtxRef.current;
             if (ctx) {
                 ctx.close().catch(() => {});
@@ -137,9 +147,6 @@ const ToneGenerator: React.FC<Props> = ({
 
     return (
         <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 12, color: "#666" }}>
-            </div>
-
             <FrequencySlider
                 value={freq}
                 min={min}
@@ -149,13 +156,19 @@ const ToneGenerator: React.FC<Props> = ({
                 onChange={onFreqChange}
                 disabled={false}
                 format={(v) => `${Math.round(v)} Hz`}
+                color={running ? "error" : "primary"}
             />
-
-            <Button id="startStopBtn"
+            <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                <Button
+                    id="startStopBtn"
                     variant="contained"
                     color={running ? "error" : "primary"}
                     onClick={running ? stop : start}
-            >{running ? "Stop Sound" : "Start Sound"}</Button>
+                    sx={{ width: "33%" }}
+                >
+                    {running ? "Stop Sound" : "Start Sound"}
+                </Button>
+            </Box>
         </div>
     );
 };
