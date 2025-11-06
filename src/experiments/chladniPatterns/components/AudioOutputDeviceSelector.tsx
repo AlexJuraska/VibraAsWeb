@@ -1,0 +1,178 @@
+import React from "react";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import Select, { SelectChangeEvent } from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import FormHelperText from "@mui/material/FormHelperText";
+import CircularProgress from "@mui/material/CircularProgress";
+import RefreshIcon from "@mui/icons-material/Refresh";
+
+type Props = {
+    audioRef?: React.RefObject<HTMLAudioElement>;
+    onSinkChange?: (sinkId: string) => void;
+    className?: string;
+    style?: React.CSSProperties;
+    label?: string;
+    storageKey?: string;
+    size?: "small" | "medium";
+    fullWidth?: boolean;
+};
+
+type OutputDevice = MediaDeviceInfo & { kind: "audiooutput" };
+
+const supportsSetSinkId =
+    typeof HTMLMediaElement !== "undefined" &&
+    "setSinkId" in (HTMLMediaElement.prototype as any);
+
+async function applySinkId(audio: HTMLAudioElement, sinkId: string): Promise<void> {
+    if (!supportsSetSinkId) return;
+    await audio.setSinkId(sinkId);
+}
+
+export const AudioOutputDeviceSelector: React.FC<Props> = ({
+                                                               audioRef,
+                                                               onSinkChange,
+                                                               className,
+                                                               style,
+                                                               label = "Output device",
+                                                               storageKey = "audio.sinkId",
+                                                               size = "small",
+                                                               fullWidth = true,
+                                                           }) => {
+    const [devices, setDevices] = React.useState<OutputDevice[]>([]);
+    const [selected, setSelected] = React.useState<string>(() => {
+        return typeof window !== "undefined"
+            ? localStorage.getItem(storageKey) || "default"
+            : "default";
+    });
+    const [loading, setLoading] = React.useState<boolean>(true);
+    const [error, setError] = React.useState<string | null>(null);
+
+    const refreshDevices = React.useCallback(async () => {
+        if (!navigator.mediaDevices?.enumerateDevices) {
+            setError("Media devices API not available.");
+            setLoading(false);
+            return;
+        }
+        try {
+            setLoading(true);
+            let list = await navigator.mediaDevices.enumerateDevices();
+
+            const labelsMissing = list.every((d) => !d.label);
+            if (labelsMissing) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach((t) => t.stop());
+                    list = await navigator.mediaDevices.enumerateDevices();
+                } catch {
+                }
+            }
+
+            const outs = list.filter((d): d is OutputDevice => d.kind === "audiooutput");
+            const hasDefault = outs.some((d) => d.deviceId === "default");
+            const withDefault = hasDefault
+                ? outs
+                : [
+                    {
+                        deviceId: "default",
+                        groupId: "",
+                        kind: "audiooutput",
+                        label: "System default",
+                        toJSON() {
+                            return this;
+                        },
+                    } as OutputDevice,
+                    ...outs,
+                ];
+            setDevices(withDefault);
+            setError(null);
+        } catch {
+            setError("Failed to enumerate audio output devices.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        void refreshDevices();
+        const handler = () => { void refreshDevices(); };
+        navigator.mediaDevices?.addEventListener?.("devicechange", handler);
+        return () => {
+            navigator.mediaDevices?.removeEventListener?.("devicechange", handler);
+        };
+    }, [refreshDevices]);
+
+    React.useEffect(() => {
+        const audio = audioRef?.current;
+        if (!audio || !supportsSetSinkId) return;
+        applySinkId(audio, selected).catch((e) => {
+            console.warn("setSinkId failed:", e);
+        });
+    }, [audioRef, selected]);
+
+    const onChange = async (e: SelectChangeEvent<string>) => {
+        const sinkId = e.target.value as string;
+        setSelected(sinkId);
+        localStorage.setItem(storageKey, sinkId);
+
+        if (audioRef?.current && supportsSetSinkId) {
+            try {
+                await applySinkId(audioRef.current, sinkId);
+            } catch (err) {
+                console.warn("Unable to switch output device:", err);
+            }
+        } else if (onSinkChange) {
+            onSinkChange(sinkId);
+        }
+    };
+
+    const disabled = !supportsSetSinkId || loading;
+    const disabledReason = !supportsSetSinkId
+        ? "Output device switching is not supported in this browser."
+        : undefined;
+
+    return (
+        <Box className={className} style={style} sx={{ minWidth: 260 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+                <Tooltip title={disabledReason || ""} disableHoverListener={supportsSetSinkId}>
+                    <FormControl variant="outlined" size={size} fullWidth={fullWidth} disabled={disabled}>
+                        <InputLabel id="audio-output-label">{label}</InputLabel>
+                        <Select
+                            labelId="audio-output-label"
+                            id="audio-output-select"
+                            label={label}
+                            value={selected}
+                            onChange={onChange}
+                        >
+                            {devices.map((d) => (
+                                <MenuItem key={d.deviceId} value={d.deviceId}>
+                                    {d.label || (d.deviceId === "default" ? "System default" : "Audio device")}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                        {error && <FormHelperText error>{error}</FormHelperText>}
+                    </FormControl>
+                </Tooltip>
+
+                <Tooltip title="Refresh devices">
+                    <span>
+                        <IconButton
+                            aria-label="refresh devices"
+                            onClick={() => { void refreshDevices(); }}
+                            disabled={loading}
+                            size={size === "small" ? "small" : "medium"}
+                        >
+                            {loading ? <CircularProgress size={20} /> : <RefreshIcon />}
+                        </IconButton>
+                    </span>
+                </Tooltip>
+            </Stack>
+        </Box>
+    );
+};
+
+export default AudioOutputDeviceSelector;

@@ -6,7 +6,6 @@ import { audioSignalBus } from "../state/audioSignalBus";
 import { startStopBus } from "../state/startStopBus";
 import { FIXED_TIME_WINDOW_S } from "./SoundToGraphConvertor";
 
-// rAF-driven offset that freezes when speed === 0 and resumes smoothly
 const useRafOffset = (windowSec: number, speed: number) => {
     const [offset, setOffset] = React.useState(0);
     const start = React.useRef<number | undefined>(undefined);

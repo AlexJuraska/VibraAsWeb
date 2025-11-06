@@ -15,7 +15,7 @@
       "component": "OscillogramGraph", "props": { "style": { "width": "100%", "height": "100%" } }
     },
     "leftPanel": {
-      "component": "BasicPanel",
+      "component": "AudioOutputDeviceSelector",
       "props": {
         "children": [
           { "component": "ColorBlock", "props": { "color": "grey", "label": "Test" } }
