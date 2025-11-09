@@ -18,14 +18,14 @@
       "component": "BasicPanel",
       "props": {
         "children": [
-          { "component": "ToneController", "props": { "label": "Chladni Tone" } },
-          { "component": "ColorBlock", "props": { "color": "grey", "label": "Test" } }
+          { "component": "AudioOutputDeviceSelector", "props": {} },
+          { "component": "GainSlider", "props": {} }
         ]
       }
     },
     "bottomPanel": {
-      "component": "ColorBlock",
-      "props": { "color": "green", "label": "Bottom Info Panel" }
+      "component": "ToneController",
+      "props": { "label": "Chladni Tone" }
     }
   },
   "grid": {

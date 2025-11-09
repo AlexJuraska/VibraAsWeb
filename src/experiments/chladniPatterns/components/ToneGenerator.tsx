@@ -1,10 +1,12 @@
-
 import React from "react";
 import FrequencySlider from "./FrequencySlider";
 import { frequencyToOscillogramData } from "./SoundToGraphConvertor";
 import type { ChartDataProps } from "../../../components/Graph";
-import {play, pause} from "../state/startStopBus";
+import { play, pause } from "../state/startStopBus";
 import Button from "@mui/material/Button";
+import { Box } from "@mui/material";
+import { publishAudioElement } from "../state/audioOutputBus";
+import { getGain, subscribeGain } from "../state/gainBus";
 
 type Props = {
     frequency?: number;
@@ -14,7 +16,6 @@ type Props = {
     min?: number;
     max?: number;
     step?: number;
-
     onStart?: (frequency: number) => void;
     onStop?: () => void;
     onOscillogram?: (data: ChartDataProps) => void;
@@ -23,19 +24,30 @@ type Props = {
 const ToneGenerator: React.FC<Props> = ({
                                             frequency = 440,
                                             type = "sine",
-                                            gain = 0.05,
+                                            gain,
                                             min = 80,
                                             max = 2000,
                                             step = 1,
                                             onStart,
                                             onStop,
-                                            onOscillogram
+                                            onOscillogram,
                                         }) => {
     const audioCtxRef = React.useRef<AudioContext | null>(null);
+    const destRef = React.useRef<MediaStreamAudioDestinationNode | null>(null);
+    const audioElRef = React.useRef<HTMLAudioElement | null>(null);
     const oscRef = React.useRef<OscillatorNode | null>(null);
     const gainRef = React.useRef<GainNode | null>(null);
+
     const [running, setRunning] = React.useState(false);
     const [freq, setFreq] = React.useState<number>(frequency);
+    const [busGain, setBusGain] = React.useState<number>(() => getGain());
+
+    React.useEffect(() => {
+        const unsub = subscribeGain(setBusGain);
+        return unsub;
+    }, []);
+
+    const effectiveGain = typeof gain === "number" ? gain : busGain;
 
     const ensureContext = React.useCallback(async (): Promise<AudioContext> => {
         if (!audioCtxRef.current) {
@@ -46,13 +58,31 @@ const ToneGenerator: React.FC<Props> = ({
         if (ctx.state === "suspended") {
             await ctx.resume();
         }
+        if (!destRef.current) {
+            destRef.current = ctx.createMediaStreamDestination();
+        }
+        if (!audioElRef.current) {
+            const audio = document.createElement("audio");
+            audio.style.position = "fixed";
+            audio.style.left = "-9999px";
+            audio.autoplay = true;
+            audio.muted = false;
+            audio.srcObject = destRef.current.stream;
+            void audio.play().catch(() => {});
+            document.body.appendChild(audio);
+            audioElRef.current = audio;
+            publishAudioElement(audio);
+        }
         return ctx;
     }, []);
 
-    const emitOscillogram = React.useCallback((f: number) => {
-        const data = frequencyToOscillogramData(f);
-        onOscillogram?.(data);
-    }, [onOscillogram]);
+    const emitOscillogram = React.useCallback(
+        (f: number) => {
+            const data = frequencyToOscillogramData(f);
+            onOscillogram?.(data);
+        },
+        [onOscillogram]
+    );
 
     const start = React.useCallback(async () => {
         if (oscRef.current) return;
@@ -64,9 +94,18 @@ const ToneGenerator: React.FC<Props> = ({
         osc.frequency.setValueAtTime(freq, ctx.currentTime);
 
         g.gain.setValueAtTime(0, ctx.currentTime);
-        g.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, gain)), ctx.currentTime + 0.03);
+        g.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, effectiveGain)), ctx.currentTime + 0.03);
 
-        osc.connect(g).connect(ctx.destination);
+        const dest = destRef.current || ctx.createMediaStreamDestination();
+        destRef.current = dest;
+        osc.connect(g).connect(dest);
+
+        if (audioElRef.current && audioElRef.current.srcObject !== dest.stream) {
+            audioElRef.current.srcObject = dest.stream;
+            void audioElRef.current.play().catch(() => {});
+            publishAudioElement(audioElRef.current);
+        }
+
         osc.start();
 
         oscRef.current = osc;
@@ -76,7 +115,7 @@ const ToneGenerator: React.FC<Props> = ({
 
         onStart?.(freq);
         emitOscillogram(freq);
-    }, [ensureContext, freq, type, gain, onStart, emitOscillogram]);
+    }, [ensureContext, freq, type, effectiveGain, onStart, emitOscillogram]);
 
     const stop = React.useCallback(() => {
         const ctx = audioCtxRef.current;
@@ -89,8 +128,13 @@ const ToneGenerator: React.FC<Props> = ({
         g.gain.setTargetAtTime(0, now, 0.02);
 
         const to = setTimeout(() => {
-            try { osc.stop(); } catch {}
-            try { osc.disconnect(); g.disconnect(); } catch {}
+            try {
+                osc.stop();
+            } catch {}
+            try {
+                osc.disconnect();
+                g.disconnect();
+            } catch {}
             oscRef.current = null;
             gainRef.current = null;
             setRunning(false);
@@ -108,9 +152,41 @@ const ToneGenerator: React.FC<Props> = ({
             const now = ctx.currentTime;
             osc.frequency.cancelScheduledValues(now);
             osc.frequency.linearRampToValueAtTime(frequency, now + 0.015);
-            if (running) emitOscillogram(frequency);
+            emitOscillogram(frequency);
         }
-    }, [frequency, running, emitOscillogram]);
+    }, [frequency, emitOscillogram]);
+
+    React.useEffect(() => {
+        const ctx = audioCtxRef.current;
+        const gNode = gainRef.current;
+        if (running && gNode && ctx) {
+            const now = ctx.currentTime;
+            gNode.gain.cancelScheduledValues(now);
+            gNode.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, effectiveGain)), now + 0.02);
+        }
+    }, [effectiveGain, running]);
+
+    React.useEffect(() => {
+        return () => {
+            try {
+                stop();
+            } catch {}
+            const ctx = audioCtxRef.current;
+            if (ctx) {
+                ctx.close().catch(() => {});
+                audioCtxRef.current = null;
+            }
+            if (audioElRef.current) {
+                try {
+                    if (audioElRef.current.parentNode)
+                        audioElRef.current.parentNode.removeChild(audioElRef.current);
+                } catch {}
+                audioElRef.current = null;
+                publishAudioElement(null);
+            }
+            destRef.current = null;
+        };
+    }, [stop]);
 
     const onFreqChange = (next: number) => {
         setFreq(next);
@@ -124,22 +200,8 @@ const ToneGenerator: React.FC<Props> = ({
         }
     };
 
-    React.useEffect(() => {
-        return () => {
-            try { stop(); } catch {}
-            const ctx = audioCtxRef.current;
-            if (ctx) {
-                ctx.close().catch(() => {});
-                audioCtxRef.current = null;
-            }
-        };
-    }, [stop]);
-
     return (
-        <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 12, color: "#666" }}>
-            </div>
-
+        <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 12 }}>
             <FrequencySlider
                 value={freq}
                 min={min}
@@ -149,13 +211,19 @@ const ToneGenerator: React.FC<Props> = ({
                 onChange={onFreqChange}
                 disabled={false}
                 format={(v) => `${Math.round(v)} Hz`}
+                color={running ? "error" : "primary"}
             />
-
-            <Button id="startStopBtn"
+            <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                <Button
+                    id="startStopBtn"
                     variant="contained"
                     color={running ? "error" : "primary"}
                     onClick={running ? stop : start}
-            >{running ? "Stop Sound" : "Start Sound"}</Button>
+                    sx={{ width: "33%" }}
+                >
+                    {running ? "Stop Sound" : "Start Sound"}
+                </Button>
+            </Box>
         </div>
     );
 };
