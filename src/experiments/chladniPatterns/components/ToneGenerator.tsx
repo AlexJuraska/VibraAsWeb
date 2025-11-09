@@ -4,8 +4,9 @@ import { frequencyToOscillogramData } from "./SoundToGraphConvertor";
 import type { ChartDataProps } from "../../../components/Graph";
 import { play, pause } from "../state/startStopBus";
 import Button from "@mui/material/Button";
-import {Box} from "@mui/material";
+import { Box } from "@mui/material";
 import { publishAudioElement } from "../state/audioOutputBus";
+import { getGain, subscribeGain } from "../state/gainBus";
 
 type Props = {
     frequency?: number;
@@ -15,7 +16,6 @@ type Props = {
     min?: number;
     max?: number;
     step?: number;
-
     onStart?: (frequency: number) => void;
     onStop?: () => void;
     onOscillogram?: (data: ChartDataProps) => void;
@@ -24,7 +24,7 @@ type Props = {
 const ToneGenerator: React.FC<Props> = ({
                                             frequency = 440,
                                             type = "sine",
-                                            gain = 0.5,
+                                            gain,
                                             min = 80,
                                             max = 2000,
                                             step = 1,
@@ -37,8 +37,17 @@ const ToneGenerator: React.FC<Props> = ({
     const audioElRef = React.useRef<HTMLAudioElement | null>(null);
     const oscRef = React.useRef<OscillatorNode | null>(null);
     const gainRef = React.useRef<GainNode | null>(null);
+
     const [running, setRunning] = React.useState(false);
     const [freq, setFreq] = React.useState<number>(frequency);
+    const [busGain, setBusGain] = React.useState<number>(() => getGain());
+
+    React.useEffect(() => {
+        const unsub = subscribeGain(setBusGain);
+        return unsub;
+    }, []);
+
+    const effectiveGain = typeof gain === "number" ? gain : busGain;
 
     const ensureContext = React.useCallback(async (): Promise<AudioContext> => {
         if (!audioCtxRef.current) {
@@ -49,7 +58,6 @@ const ToneGenerator: React.FC<Props> = ({
         if (ctx.state === "suspended") {
             await ctx.resume();
         }
-
         if (!destRef.current) {
             destRef.current = ctx.createMediaStreamDestination();
         }
@@ -65,7 +73,6 @@ const ToneGenerator: React.FC<Props> = ({
             audioElRef.current = audio;
             publishAudioElement(audio);
         }
-
         return ctx;
     }, []);
 
@@ -87,7 +94,7 @@ const ToneGenerator: React.FC<Props> = ({
         osc.frequency.setValueAtTime(freq, ctx.currentTime);
 
         g.gain.setValueAtTime(0, ctx.currentTime);
-        g.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, gain)), ctx.currentTime + 0.03);
+        g.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, effectiveGain)), ctx.currentTime + 0.03);
 
         const dest = destRef.current || ctx.createMediaStreamDestination();
         destRef.current = dest;
@@ -108,7 +115,7 @@ const ToneGenerator: React.FC<Props> = ({
 
         onStart?.(freq);
         emitOscillogram(freq);
-    }, [ensureContext, freq, type, gain, onStart, emitOscillogram]);
+    }, [ensureContext, freq, type, effectiveGain, onStart, emitOscillogram]);
 
     const stop = React.useCallback(() => {
         const ctx = audioCtxRef.current;
@@ -150,6 +157,16 @@ const ToneGenerator: React.FC<Props> = ({
     }, [frequency, emitOscillogram]);
 
     React.useEffect(() => {
+        const ctx = audioCtxRef.current;
+        const gNode = gainRef.current;
+        if (running && gNode && ctx) {
+            const now = ctx.currentTime;
+            gNode.gain.cancelScheduledValues(now);
+            gNode.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, effectiveGain)), now + 0.02);
+        }
+    }, [effectiveGain, running]);
+
+    React.useEffect(() => {
         return () => {
             try {
                 stop();
@@ -161,7 +178,8 @@ const ToneGenerator: React.FC<Props> = ({
             }
             if (audioElRef.current) {
                 try {
-                    if (audioElRef.current.parentNode) audioElRef.current.parentNode.removeChild(audioElRef.current);
+                    if (audioElRef.current.parentNode)
+                        audioElRef.current.parentNode.removeChild(audioElRef.current);
                 } catch {}
                 audioElRef.current = null;
                 publishAudioElement(null);
@@ -183,7 +201,7 @@ const ToneGenerator: React.FC<Props> = ({
     };
 
     return (
-        <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 12 }}>
             <FrequencySlider
                 value={freq}
                 min={min}

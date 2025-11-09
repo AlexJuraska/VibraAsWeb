@@ -15,10 +15,11 @@
       "component": "OscillogramGraph", "props": { "style": { "width": "100%", "height": "100%" } }
     },
     "leftPanel": {
-      "component": "AudioOutputDeviceSelector",
+      "component": "BasicPanel",
       "props": {
         "children": [
-          { "component": "ColorBlock", "props": { "color": "grey", "label": "Test" } }
+          { "component": "AudioOutputDeviceSelector", "props": {} },
+          { "component": "GainSlider", "props": {} }
         ]
       }
     },
