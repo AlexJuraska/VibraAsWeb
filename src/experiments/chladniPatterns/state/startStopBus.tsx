@@ -1,24 +1,45 @@
-export type TransportState = { playing: boolean };
+type Listener = (running: boolean) => void;
 
-type Subscriber<T> = (value: T) => void;
+let running = false;
+const subscribers = new Set<Listener>();
 
-const createBus = <T,>(initial: T) => {
-    let current = initial;
-    const subs = new Set<Subscriber<T>>();
-    return {
-        get: () => current,
-        set: (value: T) => {
-            current = value;
-            subs.forEach((fn) => fn(current));
-        },
-        subscribe: (fn: Subscriber<T>) => {
-            subs.add(fn);
-            return () => subs.delete(fn);
-        }
+const notify = () => {
+    subscribers.forEach((s) => {
+        try {
+            s(running);
+        } catch {}
+    });
+};
+
+export const play = () => {
+    if (!running) {
+        running = true;
+        notify();
+    }
+};
+
+export const pause = () => {
+    if (running) {
+        running = false;
+        notify();
+    }
+};
+
+export const getRunning = () => running;
+
+export const subscribe = (fn: Listener) => {
+    subscribers.add(fn);
+    try {
+        fn(running);
+    } catch {}
+    return () => {
+        subscribers.delete(fn);
     };
 };
 
-export const startStopBus = createBus<TransportState>({ playing: false });
-
-export const play = () => startStopBus.set({ playing: true });
-export const pause = () => startStopBus.set({ playing: false });
+export const startStopBus = {
+    play,
+    pause,
+    getRunning: () => running,
+    subscribe,
+};
