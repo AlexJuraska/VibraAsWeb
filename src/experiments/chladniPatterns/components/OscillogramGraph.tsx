@@ -52,9 +52,9 @@ const OscillogramGraph: React.FC<Props> = ({ scrollSpeed = 0.005 }) => {
         return () => { unsubscribe(); };
     }, []);
 
-    const [playing, setPlaying] = React.useState<boolean>(() => startStopBus.get().playing);
+    const [playing, setPlaying] = React.useState<boolean | void>(() => startStopBus.getRunning());
     React.useEffect(() => {
-        const unsubscribe = startStopBus.subscribe((s) => setPlaying(s.playing));
+        const unsubscribe = startStopBus.subscribe((s) => setPlaying());
         return () => { unsubscribe(); };
     }, []);
 

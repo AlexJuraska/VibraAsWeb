@@ -6,26 +6,63 @@
       "props": {
         "collapsed": true,
         "children": [
-          { "component": "ColorBlock", "props": { "color": "purple", "label": "One" } },
-          { "component": "ColorBlock", "props": { "color": "gray", "label": "Two" } }
+          {
+            "component": "ColorBlock",
+            "props": {
+              "color": "purple",
+              "label": "One"
+            }
+          },
+          {
+            "component": "ColorBlock",
+            "props": {
+              "color": "gray",
+              "label": "Two"
+            }
+          }
         ]
       }
     },
     "mainContent": {
-      "component": "OscillogramGraph", "props": { "style": { "width": "100%", "height": "100%" } }
+      "component": "OscillogramGraph",
+      "props": {
+        "style": {
+          "width": "100%",
+          "height": "100%"
+        }
+      }
     },
     "leftPanel": {
       "component": "BasicPanel",
       "props": {
         "children": [
-          { "component": "AudioOutputDeviceSelector", "props": {} },
-          { "component": "GainSlider", "props": {} }
+          {
+            "component": "AudioOutputDeviceSelector",
+            "props": {}
+          },
+          {
+            "component": "GainSlider",
+            "props": {}
+          },
+          {
+            "component": "StartStopButton",
+            "props": {}
+          }
         ]
       }
     },
     "bottomPanel": {
-      "component": "ToneController",
-      "props": { "label": "Chladni Tone" }
+      "component": "BasicPanel",
+      "props": {
+        "children": [
+          {
+            "component": "ToneController",
+            "props": {
+              "label": "chladni"
+            }
+          }
+        ]
+      }
     }
   },
   "grid": {
