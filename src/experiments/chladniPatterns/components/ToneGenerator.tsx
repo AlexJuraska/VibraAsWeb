@@ -5,6 +5,7 @@ import type { ChartDataProps } from "../../../components/Graph";
 import { play, pause } from "../state/startStopBus";
 import Button from "@mui/material/Button";
 import {Box} from "@mui/material";
+import { publishAudioElement } from "../state/audioOutputBus";
 
 type Props = {
     frequency?: number;
@@ -23,7 +24,7 @@ type Props = {
 const ToneGenerator: React.FC<Props> = ({
                                             frequency = 440,
                                             type = "sine",
-                                            gain = 0.05,
+                                            gain = 0.5,
                                             min = 80,
                                             max = 2000,
                                             step = 1,
@@ -32,6 +33,8 @@ const ToneGenerator: React.FC<Props> = ({
                                             onOscillogram,
                                         }) => {
     const audioCtxRef = React.useRef<AudioContext | null>(null);
+    const destRef = React.useRef<MediaStreamAudioDestinationNode | null>(null);
+    const audioElRef = React.useRef<HTMLAudioElement | null>(null);
     const oscRef = React.useRef<OscillatorNode | null>(null);
     const gainRef = React.useRef<GainNode | null>(null);
     const [running, setRunning] = React.useState(false);
@@ -46,6 +49,23 @@ const ToneGenerator: React.FC<Props> = ({
         if (ctx.state === "suspended") {
             await ctx.resume();
         }
+
+        if (!destRef.current) {
+            destRef.current = ctx.createMediaStreamDestination();
+        }
+        if (!audioElRef.current) {
+            const audio = document.createElement("audio");
+            audio.style.position = "fixed";
+            audio.style.left = "-9999px";
+            audio.autoplay = true;
+            audio.muted = false;
+            audio.srcObject = destRef.current.stream;
+            void audio.play().catch(() => {});
+            document.body.appendChild(audio);
+            audioElRef.current = audio;
+            publishAudioElement(audio);
+        }
+
         return ctx;
     }, []);
 
@@ -69,7 +89,16 @@ const ToneGenerator: React.FC<Props> = ({
         g.gain.setValueAtTime(0, ctx.currentTime);
         g.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, gain)), ctx.currentTime + 0.03);
 
-        osc.connect(g).connect(ctx.destination);
+        const dest = destRef.current || ctx.createMediaStreamDestination();
+        destRef.current = dest;
+        osc.connect(g).connect(dest);
+
+        if (audioElRef.current && audioElRef.current.srcObject !== dest.stream) {
+            audioElRef.current.srcObject = dest.stream;
+            void audioElRef.current.play().catch(() => {});
+            publishAudioElement(audioElRef.current);
+        }
+
         osc.start();
 
         oscRef.current = osc;
@@ -120,6 +149,27 @@ const ToneGenerator: React.FC<Props> = ({
         }
     }, [frequency, emitOscillogram]);
 
+    React.useEffect(() => {
+        return () => {
+            try {
+                stop();
+            } catch {}
+            const ctx = audioCtxRef.current;
+            if (ctx) {
+                ctx.close().catch(() => {});
+                audioCtxRef.current = null;
+            }
+            if (audioElRef.current) {
+                try {
+                    if (audioElRef.current.parentNode) audioElRef.current.parentNode.removeChild(audioElRef.current);
+                } catch {}
+                audioElRef.current = null;
+                publishAudioElement(null);
+            }
+            destRef.current = null;
+        };
+    }, [stop]);
+
     const onFreqChange = (next: number) => {
         setFreq(next);
         const ctx = audioCtxRef.current;
@@ -131,19 +181,6 @@ const ToneGenerator: React.FC<Props> = ({
             if (running) emitOscillogram(next);
         }
     };
-
-    React.useEffect(() => {
-        return () => {
-            try {
-                stop();
-            } catch {}
-            const ctx = audioCtxRef.current;
-            if (ctx) {
-                ctx.close().catch(() => {});
-                audioCtxRef.current = null;
-            }
-        };
-    }, [stop]);
 
     return (
         <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>

@@ -88,7 +88,6 @@ const isValidChartData = (d: any): d is ChartDataProps => {
 const Graph: React.FC<Props> = ({ data, options, plugins, className, style }) => {
     const theme = useTheme<Theme>();
 
-    // Provide a safe empty dataset when no data is passed
     const emptyData = React.useMemo<ChartDataProps>(() => ({
         datasets: [
             {

@@ -1,9 +1,9 @@
 import type { ChartDataProps, Point } from '../../../components/Graph';
 
-export const FIXED_TIME_WINDOW_S = 0.05; // constant X range in seconds
+export const FIXED_TIME_WINDOW_S = 0.05;
 
-const POINTS_PER_CYCLE = 64;       // smoothness target
-const MAX_POINTS = 3000;           // performance cap
+const POINTS_PER_CYCLE = 64;
+const MAX_POINTS = 3000;
 const Y_MAX = 1;
 const Y_MIN = -1;
 
@@ -18,7 +18,6 @@ export function frequencyToOscillogramData(
 
     const period = 1 / frequency;
 
-    // Adaptive step: aim for N points per cycle, but cap total points over the fixed window
     const desiredStep = period / POINTS_PER_CYCLE;
     const minStepToRespectCap = FIXED_TIME_WINDOW_S / MAX_POINTS;
     const step = Math.max(desiredStep, minStepToRespectCap);

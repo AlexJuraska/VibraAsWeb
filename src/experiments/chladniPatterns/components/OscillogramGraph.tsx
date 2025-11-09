@@ -55,7 +55,7 @@ const OscillogramGraph: React.FC<Props> = ({ scrollSpeed = 0.005 }) => {
     const [playing, setPlaying] = React.useState<boolean>(() => startStopBus.get().playing);
     React.useEffect(() => {
         const unsubscribe = startStopBus.subscribe((s) => setPlaying(s.playing));
-        return () => { unsubscribe(); }; // ensure the effect cleanup returns void
+        return () => { unsubscribe(); };
     }, []);
 
     const effectiveSpeed = playing ? scrollSpeed : 0;

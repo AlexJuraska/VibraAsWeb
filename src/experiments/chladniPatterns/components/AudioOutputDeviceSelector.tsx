@@ -3,13 +3,14 @@ import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
-import Select, { SelectChangeEvent } from "@mui/material/Select";
+import Select, {SelectChangeEvent} from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import FormHelperText from "@mui/material/FormHelperText";
 import CircularProgress from "@mui/material/CircularProgress";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import {subscribeAudioElement} from "../state/audioOutputBus";
 
 type Props = {
     audioRef?: React.RefObject<HTMLAudioElement>;
@@ -30,7 +31,7 @@ const supportsSetSinkId =
 
 async function applySinkId(audio: HTMLAudioElement, sinkId: string): Promise<void> {
     if (!supportsSetSinkId) return;
-    await audio.setSinkId(sinkId);
+    await (audio as any).setSinkId(sinkId);
 }
 
 export const AudioOutputDeviceSelector: React.FC<Props> = ({
@@ -51,6 +52,15 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
     });
     const [loading, setLoading] = React.useState<boolean>(true);
     const [error, setError] = React.useState<string | null>(null);
+
+    const [busAudio, setBusAudio] = React.useState<HTMLAudioElement | null>(null);
+    React.useEffect(() => {
+        if (audioRef) {
+            setBusAudio(null);
+            return;
+        }
+        return subscribeAudioElement(setBusAudio);
+    }, [audioRef]);
 
     const refreshDevices = React.useCallback(async () => {
         if (!navigator.mediaDevices?.enumerateDevices) {
@@ -107,21 +117,22 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
     }, [refreshDevices]);
 
     React.useEffect(() => {
-        const audio = audioRef?.current;
+        const audio = audioRef?.current ?? busAudio;
         if (!audio || !supportsSetSinkId) return;
         applySinkId(audio, selected).catch((e) => {
             console.warn("setSinkId failed:", e);
         });
-    }, [audioRef, selected]);
+    }, [audioRef, busAudio, selected]);
 
     const onChange = async (e: SelectChangeEvent<string>) => {
         const sinkId = e.target.value as string;
         setSelected(sinkId);
         localStorage.setItem(storageKey, sinkId);
 
-        if (audioRef?.current && supportsSetSinkId) {
+        const audio = audioRef?.current ?? busAudio;
+        if (audio && supportsSetSinkId) {
             try {
-                await applySinkId(audioRef.current, sinkId);
+                await applySinkId(audio, sinkId);
             } catch (err) {
                 console.warn("Unable to switch output device:", err);
             }
@@ -159,16 +170,16 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                 </Tooltip>
 
                 <Tooltip title="Refresh devices">
-                    <span>
-                        <IconButton
-                            aria-label="refresh devices"
-                            onClick={() => { void refreshDevices(); }}
-                            disabled={loading}
-                            size={size === "small" ? "small" : "medium"}
-                        >
-                            {loading ? <CircularProgress size={20} /> : <RefreshIcon />}
-                        </IconButton>
-                    </span>
+          <span>
+            <IconButton
+                aria-label="refresh devices"
+                onClick={() => { void refreshDevices(); }}
+                disabled={loading}
+                size={size === "small" ? "small" : "medium"}
+            >
+              {loading ? <CircularProgress size={20} /> : <RefreshIcon />}
+            </IconButton>
+          </span>
                 </Tooltip>
             </Stack>
         </Box>
