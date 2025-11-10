@@ -42,8 +42,8 @@ const GainSlider: React.FC<GainSliderProps> = ({
     };
 
     return (
-        <Box sx={{ width: "90%"}}>
-            <Typography variant="caption" gutterBottom>
+        <Box>
+            <Typography variant="caption" sx={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }} gutterBottom >
                 {label}: {format(displayValue)}
             </Typography>
             <Slider

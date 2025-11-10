@@ -22,7 +22,7 @@ const StartStopButton: React.FC<Props> = ({ id = "startStopBtn", width = "33%" }
 
     return (
         <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-            <Button id={id} variant="contained" color={running ? "error" : "primary"} onClick={handleClick} sx={{ width }}>
+            <Button id={id} variant="contained" color={running ? "error" : "primary"} size={"large"} onClick={handleClick} sx={{ width, fontSize: 16 }}>
                 {running ? "Stop Sound" : "Start Sound"}
             </Button>
         </Box>

@@ -41,7 +41,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                                                                style,
                                                                label = "Output device",
                                                                storageKey = "audio.sinkId",
-                                                               size = "small",
+                                                               size = "medium",
                                                                fullWidth = true,
                                                            }) => {
     const [devices, setDevices] = React.useState<OutputDevice[]>([]);
@@ -150,7 +150,9 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
         <Box className={className} style={style} sx={{ minWidth: 260 }}>
             <Stack direction="row" spacing={1} alignItems="center">
                 <Tooltip title={disabledReason || ""} disableHoverListener={supportsSetSinkId}>
-                    <FormControl variant="outlined" size={size} fullWidth={fullWidth} disabled={disabled}>
+                    <FormControl
+                        variant="outlined" size={size} fullWidth={fullWidth} disabled={disabled}
+                        sx={{ '& .MuiInputBase-input': { fontSize: 18 }, '& .MuiInputLabel-root': { fontSize: 18 } }}>
                         <InputLabel id="audio-output-label">{label}</InputLabel>
                         <Select
                             labelId="audio-output-label"
@@ -160,7 +162,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                             onChange={onChange}
                         >
                             {devices.map((d) => (
-                                <MenuItem key={d.deviceId} value={d.deviceId}>
+                                <MenuItem key={d.deviceId} value={d.deviceId} sx={{ fontSize: 18 }}>
                                     {d.label || (d.deviceId === "default" ? "System default" : "Audio device")}
                                 </MenuItem>
                             ))}

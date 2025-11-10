@@ -11,7 +11,7 @@ function Home() {
 
     return (
         <Box display="flex" flexDirection="column" alignItems="center" gap={3} mt={6}>
-            <Typography variant="h3">Welcome to VibraASS</Typography>
+            <Typography variant="h3">Welcome to VibraAS</Typography>
             <Typography variant="subtitle1" color="text.secondary">
                 Choose an experiment to explore
             </Typography>

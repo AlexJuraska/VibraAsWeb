@@ -6,20 +6,11 @@
       "props": {
         "collapsed": true,
         "children": [
-          {
-            "component": "ColorBlock",
-            "props": {
-              "color": "purple",
-              "label": "One"
-            }
-          },
-          {
-            "component": "ColorBlock",
-            "props": {
-              "color": "gray",
-              "label": "Two"
-            }
-          }
+          { "component": "AudioOutputDeviceSelector", "props": { "size": "medium"} },
+          { "component": "GainSlider", "props": {} },
+          { "component": "StartStopButton", "props": {} },
+          { "component": "ToneController", "props": { "label": "chladni" } },
+          { "component": "HomeButton", "props": { "to": "/", "color": "primary" } }
         ]
       }
     },
@@ -36,51 +27,37 @@
       "component": "BasicPanel",
       "props": {
         "children": [
-          {
-            "component": "AudioOutputDeviceSelector",
-            "props": {}
-          },
-          {
-            "component": "GainSlider",
-            "props": {}
-          },
-          {
-            "component": "StartStopButton",
-            "props": {}
-          }
+          { "component": "AudioOutputDeviceSelector", "props": { "size": "medium"} },
+          { "component": "GainSlider", "props": {} },
+          { "component": "StartStopButton", "props": {} },
+          { "component": "ToneController", "props": { "label": "chladni" } }
         ]
       }
     },
-    "bottomPanel": {
-      "component": "BasicPanel",
+    "homeButton": {
+      "component": "HomeButton",
       "props": {
-        "children": [
-          {
-            "component": "ToneController",
-            "props": {
-              "label": "chladni"
-            }
-          }
-        ]
+        "to": "/",
+        "color": "primary"
       }
     }
   },
   "grid": {
     "xs": {
       "areas": [
-        ["CollapsiblePanel", "mainContent"],
-        ["CollapsiblePanel", "bottomPanel"]
+        ["CollapsiblePanel"],
+        ["mainContent"]
       ],
-      "columns": ["55px", "1fr"],
-      "rows": ["8fr", "1fr"]
+      "columns": ["1fr"],
+      "rows": ["60px", "1fr"]
     },
-    "md": {
+    "xl": {
       "areas": [
         ["leftPanel", "mainContent"],
-        ["leftPanel", "bottomPanel"]
+        ["homeButton", "mainContent"]
       ],
       "columns": ["2fr", "8fr"],
-      "rows": ["8fr", "1.5fr"]
+      "rows": ["1fr", "80px"]
     }
   }
 }

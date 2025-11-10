@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Slider, Button, TextField, InputAdornment } from "@mui/material";
+import {Box, Slider, Button, TextField, InputAdornment} from "@mui/material";
 import type { TextFieldProps } from "@mui/material/TextField";
 
 type FrequencySliderProps = {
@@ -106,12 +106,12 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
     }, [onChange, value, min]);
 
     return (
-        <Box display="flex" flexDirection="column" gap={1}>
-            <Box sx={{ width: "25%", display: "flex", alignContent: "center" }}>
+        <Box display="flex" flexDirection="column" gap={1} sx={{ width: '100%' }}>
+            <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', boxSizing: 'border-box' }}>
                 <TextField
                     label={label}
                     type="number"
-                    size="small"
+                    size="medium"
                     color={color}
                     disabled={disabled}
                     value={input}
@@ -119,7 +119,7 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                     onFocus={() => setEditing(true)}
                     onBlur={commitInput}
                     onKeyDown={onInputKeyDown}
-                    sx={{ width: "33%" }}
+                    sx={{ '& .MuiInputBase-input': { fontSize: 18 }, '& .MuiInputLabel-root': { fontSize: 18 } }}
                     slotProps={{
                         input: {
                             endAdornment: <InputAdornment position="end">Hz</InputAdornment>,
@@ -156,8 +156,8 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                         aria-label={label}
                     />
                     <Box display="flex" justifyContent="space-between">
-                        <span style={{ fontSize: 12, color: "rgba(0,0,0,0.6)" }}>{min} Hz</span>
-                        <span style={{ fontSize: 12, color: "rgba(0,0,0,0.6)" }}>{max} Hz</span>
+                        <span style={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }}>{min} Hz</span>
+                        <span style={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }}>{max} Hz</span>
                     </Box>
                 </Box>
 
