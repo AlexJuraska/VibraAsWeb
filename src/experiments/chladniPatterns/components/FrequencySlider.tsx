@@ -1,6 +1,7 @@
 import React from "react";
 import {Box, Slider, Button, TextField, InputAdornment} from "@mui/material";
 import type { TextFieldProps } from "@mui/material/TextField";
+import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
 
 type FrequencySliderProps = {
     value: number;
@@ -27,12 +28,25 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                                                              showStepButtons = false,
                                                              color = "primary",
                                                          }) => {
+
     const [input, setInput] = React.useState<string>(String(Math.round(value)));
     const [editing, setEditing] = React.useState(false);
 
+    // Keep the text input in sync with the prop value when not editing
     React.useEffect(() => {
         if (!editing) setInput(String(Math.round(value)));
     }, [value, editing]);
+
+    // Subscribe to external frequency changes on the bus and propagate them to the parent.
+    // This ensures the slider updates when another component (e.g. saved dropdown) publishes a frequency.
+    React.useEffect(() => {
+        const unsub = subscribeCurrentFrequency((freq: number) => {
+            if (freq !== value) {
+                onChange(freq);
+            }
+        });
+        return unsub;
+    }, [onChange, value]);
 
     const clampAndSnap = React.useCallback(
         (v: number) => {
@@ -43,6 +57,14 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
             return next;
         },
         [min, max, step, value]
+    );
+
+    const send = React.useCallback(
+        (next: number) => {
+            onChange(next);
+            publishFrequency(next);
+        },
+        [onChange]
     );
 
     const commitInput = React.useCallback(() => {
@@ -66,9 +88,9 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
         }
 
         setInput(String(Math.round(next)));
-        if (next !== value) onChange(next);
+        if (next !== value) send(next);
         setEditing(false);
-    }, [input, min, max, step, value, onChange]);
+    }, [input, min, max, step, value, send]);
 
     const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter") {
@@ -91,19 +113,21 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
 
             if (parsed >= min && parsed <= max) {
                 const next = clampAndSnap(parsed);
-                if (next !== value) onChange(next);
+                if (next !== value) send(next);
             }
         },
-        [min, max, value, onChange, clampAndSnap]
+        [min, max, value, send, clampAndSnap]
     );
 
     const inc = React.useCallback(() => {
-        onChange(Math.min(max, value + 1));
-    }, [onChange, value, max]);
+        const next = Math.min(max, value + 1);
+        send(next);
+    }, [send, value, max]);
 
     const dec = React.useCallback(() => {
-        onChange(Math.max(min, value - 1));
-    }, [onChange, value, min]);
+        const next = Math.max(min, value - 1);
+        send(next);
+    }, [send, value, min]);
 
     return (
         <Box display="flex" flexDirection="column" gap={1} sx={{ width: '100%' }}>
@@ -149,9 +173,10 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                         min={min}
                         max={max}
                         step={step}
-                        onChange={(_, newValue) =>
-                            onChange(Array.isArray(newValue) ? (newValue[0] as number) : (newValue as number))
-                        }
+                        onChange={(_, newValue) => {
+                            const nv = Array.isArray(newValue) ? (newValue[0] as number) : (newValue as number);
+                            send(nv);
+                        }}
                         disabled={disabled}
                         aria-label={label}
                     />

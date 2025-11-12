@@ -1,4 +1,4 @@
-let currentGain = 0.5;
+let currentGain = 0.1;
 const listeners = new Set<(g: number) => void>();
 
 function clamp01(v: number): number {

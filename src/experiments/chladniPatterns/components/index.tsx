@@ -4,3 +4,4 @@ export { default as ToneController } from './ToneController';
 export { default as AudioOutputDeviceSelector } from './AudioOutputDeviceSelector';
 export { default as GainSlider } from './GainSlider';
 export { default as StartStopButton } from './StartStopButton';
+export { default as SavedFrequencyDropdown } from './SavedFrequencyDropdown';

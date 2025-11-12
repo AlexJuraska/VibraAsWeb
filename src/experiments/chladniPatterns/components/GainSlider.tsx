@@ -18,7 +18,7 @@ type GainSliderProps = {
 const GainSlider: React.FC<GainSliderProps> = ({
                                                    value,
                                                    min = 0,
-                                                   max = 1,
+                                                   max = 0.5,
                                                    step = 0.01,
                                                    label = "Gain",
                                                    disabled = false,
