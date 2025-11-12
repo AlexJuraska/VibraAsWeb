@@ -1,4 +1,3 @@
-// typescript
 import React from "react";
 import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
 
@@ -45,7 +44,6 @@ export default function SavedFrequencyDropdown() {
         setOpen(false);
     }, []);
 
-    // label shown inside the field/button
     const fieldPrimary = React.useMemo(
         () => `Saved Frequencies${savedFrequencies.length > 0 ? ` (${savedFrequencies.length})` : ""}`,
         [savedFrequencies.length]

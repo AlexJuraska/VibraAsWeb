@@ -32,13 +32,10 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
     const [input, setInput] = React.useState<string>(String(Math.round(value)));
     const [editing, setEditing] = React.useState(false);
 
-    // Keep the text input in sync with the prop value when not editing
     React.useEffect(() => {
         if (!editing) setInput(String(Math.round(value)));
     }, [value, editing]);
 
-    // Subscribe to external frequency changes on the bus and propagate them to the parent.
-    // This ensures the slider updates when another component (e.g. saved dropdown) publishes a frequency.
     React.useEffect(() => {
         const unsub = subscribeCurrentFrequency((freq: number) => {
             if (freq !== value) {
