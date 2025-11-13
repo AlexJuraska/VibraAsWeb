@@ -18,5 +18,5 @@ export const audioSignalBus = {
     },
     get() {
         return current;
-    }
+    },
 };

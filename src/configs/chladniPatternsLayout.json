@@ -10,6 +10,7 @@
           { "component": "GainSlider", "props": {} },
           { "component": "StartStopButton", "props": {} },
           { "component": "ToneController", "props": { "label": "chladni" } },
+          { "component": "SavedFrequencyDropdown", "props": {} },
           { "component": "HomeButton", "props": { "to": "/", "color": "primary" } }
         ]
       }
@@ -30,7 +31,8 @@
           { "component": "AudioOutputDeviceSelector", "props": { "size": "medium"} },
           { "component": "GainSlider", "props": {} },
           { "component": "StartStopButton", "props": {} },
-          { "component": "ToneController", "props": { "label": "chladni" } }
+          { "component": "ToneController", "props": { "label": "chladni" } },
+          { "component": "SavedFrequencyDropdown", "props": {} }
         ]
       }
     },
