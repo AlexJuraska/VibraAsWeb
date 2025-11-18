@@ -116,15 +116,66 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
         [min, max, value, send, clampAndSnap]
     );
 
+    const valueRef = React.useRef<number>(value);
+    React.useEffect(() => {
+        valueRef.current = value;
+    }, [value]);
+
     const inc = React.useCallback(() => {
-        const next = Math.min(max, value + 1);
+        const next = Math.min(max, valueRef.current + 1);
         send(next);
-    }, [send, value, max]);
+    }, [send, max]);
 
     const dec = React.useCallback(() => {
-        const next = Math.max(min, value - 1);
+        const next = Math.max(min, valueRef.current - 1);
         send(next);
-    }, [send, value, min]);
+    }, [send, min]);
+
+    const REPEAT_DELAY_MS = 300;
+    const REPEAT_INTERVAL_MS = 50;
+
+    const repeatIntervalRef = React.useRef<number | null>(null);
+    const repeatTimeoutRef = React.useRef<number | null>(null);
+    const ignoreNextClickRef = React.useRef(false);
+
+    const startRepeat = React.useCallback((fn: () => void) => {
+        if (repeatIntervalRef.current != null || repeatTimeoutRef.current != null) return;
+
+        fn();
+        ignoreNextClickRef.current = true;
+
+        repeatTimeoutRef.current = window.setTimeout(() => {
+            repeatTimeoutRef.current = null;
+            repeatIntervalRef.current = window.setInterval(fn, REPEAT_INTERVAL_MS);
+        }, REPEAT_DELAY_MS);
+    }, []);
+
+    const stopRepeat = React.useCallback(() => {
+        if (repeatIntervalRef.current != null) {
+            clearInterval(repeatIntervalRef.current);
+            repeatIntervalRef.current = null;
+        }
+        if (repeatTimeoutRef.current != null) {
+            clearTimeout(repeatTimeoutRef.current);
+            repeatTimeoutRef.current = null;
+        }
+        setTimeout(() => {
+            ignoreNextClickRef.current = false;
+        }, 0);
+    }, []);
+
+    React.useEffect(() => {
+        return () => {
+            if (repeatIntervalRef.current != null) {
+                clearInterval(repeatIntervalRef.current);
+                repeatIntervalRef.current = null;
+            }
+            if (repeatTimeoutRef.current != null) {
+                clearTimeout(repeatTimeoutRef.current);
+                repeatTimeoutRef.current = null;
+            }
+        };
+    }, []);
 
     return (
         <Box display="flex" flexDirection="column" gap={1} sx={{ width: '100%' }}>
@@ -150,14 +201,25 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                 />
             </Box>
 
-            <Box display="flex" alignItems="center" gap={1.5}>
+            <Box display="flex" alignItems="center" gap={0.5}>
                 {showStepButtons && (
                     <Button
                         aria-label="decrease frequency"
                         variant="outlined"
                         size="small"
-                        color={color}
-                        onClick={dec}
+                        color="primary"
+                        onMouseDown={() => startRepeat(dec)}
+                        onMouseUp={stopRepeat}
+                        onMouseLeave={stopRepeat}
+                        onTouchStart={(e) => { e.preventDefault(); startRepeat(dec); }}
+                        onTouchEnd={stopRepeat}
+                        onClick={(e) => {
+                            if (ignoreNextClickRef.current) {
+                                ignoreNextClickRef.current = false;
+                                return;
+                            }
+                            dec();
+                        }}
                         disabled={!!disabled || value <= min}
                     >
                         -
@@ -188,8 +250,19 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                         aria-label="increase frequency"
                         variant="outlined"
                         size="small"
-                        color={color}
-                        onClick={inc}
+                        color="primary"
+                        onMouseDown={() => startRepeat(inc)}
+                        onMouseUp={stopRepeat}
+                        onMouseLeave={stopRepeat}
+                        onTouchStart={(e) => { e.preventDefault(); startRepeat(inc); }}
+                        onTouchEnd={stopRepeat}
+                        onClick={(e) => {
+                            if (ignoreNextClickRef.current) {
+                                ignoreNextClickRef.current = false;
+                                return;
+                            }
+                            inc();
+                        }}
                         disabled={!!disabled || value >= max}
                     >
                         +

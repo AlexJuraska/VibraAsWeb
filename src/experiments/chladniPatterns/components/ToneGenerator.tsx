@@ -225,6 +225,7 @@ const ToneGenerator: React.FC<Props> = ({
                 label="Frequency"
                 onChange={onFreqChange}
                 disabled={false}
+                showStepButtons={true}
                 format={(v) => `${Math.round(v)} Hz`}
                 color={running ? "error" : "primary"}
             />

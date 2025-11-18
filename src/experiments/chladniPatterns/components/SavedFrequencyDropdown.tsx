@@ -52,7 +52,7 @@ export default function SavedFrequencyDropdown() {
         () =>
             savedFrequencies.includes(currentFreq)
                 ? `${currentFreq} Hz`
-                : `Current: ${currentFreq} Hz`,
+                : ``,
         [savedFrequencies, currentFreq]
     );
 
