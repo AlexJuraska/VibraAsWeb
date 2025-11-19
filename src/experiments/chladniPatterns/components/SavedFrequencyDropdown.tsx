@@ -1,5 +1,13 @@
 import React from "react";
 import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
+import {
+    addSavedFrequency,
+    subscribeSavedFrequencies,
+    getSavedFrequencies,
+} from "../state/savedFrequencies";
+import FileExporter from "../components/SavedFreqFileExporter";
+import SavedFreqFileImporter from "../components/SavedFreqFileImporter";
+import {Box, Button, List, ListItemButton, Paper, Typography} from "@mui/material";
 
 export default function SavedFrequencyDropdown() {
     const [currentFreq, setCurrentFreq] = React.useState<number>(0);
@@ -10,6 +18,13 @@ export default function SavedFrequencyDropdown() {
     React.useEffect(() => {
         const unsub = subscribeCurrentFrequency((freq: number) => {
             setCurrentFreq(freq);
+        });
+        return unsub;
+    }, []);
+
+    React.useEffect(() => {
+        const unsub = subscribeSavedFrequencies((freqs) => {
+            setSavedFrequencies(freqs);
         });
         return unsub;
     }, []);
@@ -31,11 +46,8 @@ export default function SavedFrequencyDropdown() {
         };
     }, [open]);
 
-    const AddCurrentFrequency = React.useCallback(() => {
-        setSavedFrequencies((prev) => {
-            if (prev.includes(currentFreq)) return prev;
-            return [...prev, currentFreq];
-        });
+    const addCurrentFrequency = React.useCallback(() => {
+        addSavedFrequency(currentFreq);
     }, [currentFreq]);
 
     const onSelectFrequency = React.useCallback((v: number) => {
@@ -58,86 +70,123 @@ export default function SavedFrequencyDropdown() {
 
     if (savedFrequencies.length === 0) {
         return (
-            <div>
-                <label htmlFor="savedFrequencies">
+            <Box>
+                <Typography variant="body2">
                     You do not have any saved frequencies. You can add more with the button below or import a file
-                    with saved frequencies
-                </label>
-                <div style={{ marginTop: 8 }}>
-                    <button onClick={AddCurrentFrequency}>Save Current Frequency</button>
-                </div>
-            </div>
+                    with saved frequencies.
+                </Typography>
+                <Box mt={1}>
+                    <Button variant="contained" color="primary" onClick={addCurrentFrequency}>
+                        Save Current Frequency
+                    </Button>
+                </Box>
+                <Box sx={{ flexBasis: "100%"}}>
+                    <SavedFreqFileImporter />
+                </Box>
+            </Box>
         );
     }
 
     return (
-        <div ref={containerRef} style={{ position: "relative", width: 260 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <button
+        <Box ref={containerRef} sx={{ position: "relative", width: "100%" }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                }}
+            >
+                <Button
                     aria-haspopup="listbox"
                     aria-expanded={open}
                     onClick={() => setOpen((s) => !s)}
-                    style={{
-                        flex: 1,
-                        textAlign: "left",
-                        display: "flex",
+                    variant="outlined"
+                    color="primary"
+                    fullWidth
+                    sx={{
+                        justifyContent: "flex-start",
+                        textTransform: "none",
+                        py: 1,
                         flexDirection: "column",
                         alignItems: "flex-start",
-                        padding: "8px",
                     }}
                 >
-                    <span style={{ fontWeight: 600 }}>{fieldPrimary}</span>
-                    <span style={{ fontSize: 13, color: "rgba(0,0,0,0.6)", marginTop: 4 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {fieldPrimary}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                         {fieldSecondary}
-                    </span>
-                </button>
-                <div style={{ marginLeft: 8 }}>
-                    <button onClick={AddCurrentFrequency}>Save</button>
-                </div>
-            </div>
+                    </Typography>
+                </Button>
+            </Box>
 
             {open && (
-                <ul
-                    role="listbox"
-                    aria-label="Saved Frequencies"
-                    tabIndex={-1}
-                    style={{
+                <Paper
+                    elevation={4}
+                    sx={{
                         position: "absolute",
                         top: 64,
                         left: 0,
                         right: 0,
                         maxHeight: 200,
                         overflowY: "auto",
-                        margin: 0,
-                        padding: "8px",
-                        listStyle: "none",
-                        background: "white",
-                        border: "1px solid rgba(0,0,0,0.15)",
-                        borderRadius: 4,
-                        boxShadow: "0 4px 8px rgba(0,0,0,0.08)",
+                        mt: 1,
                         zIndex: 1000,
                     }}
                 >
-                    {savedFrequencies.map((freq, i) => (
-                        <li key={i} style={{ marginBottom: 6 }}>
-                            <button
-                                onClick={() => onSelectFrequency(freq)}
-                                style={{
-                                    width: "100%",
-                                    textAlign: "left",
-                                    padding: "6px 8px",
-                                    background: freq === currentFreq ? "rgba(0,0,0,0.06)" : "transparent",
-                                    border: "none",
-                                    cursor: "pointer",
-                                }}
-                                aria-selected={freq === currentFreq}
-                            >
-                                {freq} Hz{freq === currentFreq ? " (current)" : ""}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
+                    <List dense disablePadding>
+                        {savedFrequencies.map((freq, i) => {
+                            const isCurrent = freq === currentFreq;
+                            return (
+                                <ListItemButton
+                                    key={i}
+                                    onClick={() => onSelectFrequency(freq)}
+                                    selected={isCurrent}
+                                >
+                                    <Typography variant="body2">
+                                        {freq} Hz{isCurrent ? " (current)" : ""}
+                                    </Typography>
+                                </ListItemButton>
+                            );
+                        })}
+                    </List>
+                </Paper>
             )}
-        </div>
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "flex-start",
+                    gap: 1,
+                    mt: 1,
+                }}
+            >
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={addCurrentFrequency}
+                    sx={{ whiteSpace: "nowrap" }}
+                >
+                    Save current frequency
+                </Button>
+
+                <FileExporter
+                    fileName="frequencies.txt"
+                    label="Export saved frequencies"
+                    getContent={() => {
+                        const frequencies = getSavedFrequencies();
+                        const sorted = [...frequencies].sort((a, b) => a - b);
+                        return sorted.map((f) => `${f}`).join("\n");
+                    }}
+                    buttonProps={{
+                        variant: "outlined",
+                        color: "primary",
+                        sx: { whiteSpace: "nowrap", textTransform: "none" },
+                    }}
+                />
+            </Box>
+            <Box sx={{ flexBasis: "100%"}}>
+                <SavedFreqFileImporter />
+            </Box>
+        </Box>
+
     );
 }
