@@ -22,15 +22,18 @@ const HomeButton: React.FC<HomeButtonProps> = ({
             variant={"contained"}
             color={color}
             onClick={() => navigate(to)}
-            sx={{
-                minWidth: 48,
-                width: "100%",
+            sx={(theme) => ({
                 height: 60,
+                width: "100%",
+                maxWidth: `calc(100% - 2 * ${theme.spacing(1)})`,
+                boxSizing: "border-box",
                 display: "flex",
+                flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "center",
                 borderRadius: "12px",
-            }}
+                margin: theme.spacing(1),
+            })}
         >
             <Suspense fallback={null}>
                 <HomeIcon />
