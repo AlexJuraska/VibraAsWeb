@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { IconButton, Drawer, useMediaQuery, useTheme } from "@mui/material";
+import  React, { useState } from "react";
+import { IconButton, Drawer, useTheme } from "@mui/material";
 import { Menu as MenuIcon, ChevronLeft } from "@mui/icons-material";
 import * as ChladniComponents from "../experiments/chladniPatterns/components";
 import ColorBlock from "./ColorBlock";
@@ -9,12 +9,11 @@ const AppComponents = { ...ChladniComponents, ColorBlock };
 interface CollapsiblePanelProps {
     collapsed?: boolean;
     children?: { component: string; props?: Record<string, any> }[];
-
 }
 
 const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                                                                       collapsed = false,
-                                                                      children = []
+                                                                      children = [],
                                                                   }) => {
     const [open, setOpen] = useState(!collapsed);
     const theme = useTheme();
@@ -32,16 +31,19 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
             <IconButton
                 onClick={toggle}
                 sx={{
+                    height: "100%",
+                    width: "100%",
                     position: "absolute",
                     top: 8,
                     left: 8,
                     zIndex: 2000,
                     color: "white",
                     backgroundColor: "rgba(0,0,0,0.4)",
-                    "&:hover": { backgroundColor: "rgba(0,0,0,0.6)" }
+                    "&:hover": { backgroundColor: "rgba(0,0,0,0.6)" },
+                    display: open ? "none" : "flex",
                 }}
             >
-                {open ? <ChevronLeft /> : <MenuIcon />}
+                <MenuIcon/>
             </IconButton>
 
             <Drawer
@@ -51,8 +53,10 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                 ModalProps={{ keepMounted: true }}
                 PaperProps={{
                     sx: {
-                        width: 240,
+                        width: "80vw",
                         backgroundColor: theme.palette.background.paper,
+                        padding: theme.spacing(3),
+                        gap: theme.spacing(2),
                     }
                 }}
             >

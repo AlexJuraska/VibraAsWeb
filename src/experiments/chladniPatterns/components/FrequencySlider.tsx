@@ -1,7 +1,8 @@
 import React from "react";
-import {Box, Slider, Button, TextField, InputAdornment} from "@mui/material";
+import {Box, Slider, Button, TextField, InputAdornment, Typography} from "@mui/material";
 import type { TextFieldProps } from "@mui/material/TextField";
 import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
+import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 type FrequencySliderProps = {
     value: number;
@@ -177,6 +178,12 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
         };
     }, []);
 
+    const [bp, setBp] = React.useState(getBreakpoint());
+
+    React.useEffect(() => {
+        return subscribeBreakpoint(setBp);
+    }, []);
+
     return (
         <Box display="flex" flexDirection="column" gap={1} width="100%">
 
@@ -184,7 +191,7 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                 <TextField
                     label={label}
                     type="number"
-                    size="medium"
+                    size={ bp }
                     color={color}
                     disabled={disabled}
                     value={input}
@@ -192,10 +199,6 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                     onFocus={() => setEditing(true)}
                     onBlur={commitInput}
                     onKeyDown={onInputKeyDown}
-                    sx={{
-                        "& .MuiInputBase-input": { fontSize: 18 },
-                        "& .MuiInputLabel-root": { fontSize: 18 },
-                    }}
                     slotProps={{
                         input: {
                             endAdornment: <InputAdornment position="end">Hz</InputAdornment>,
@@ -210,7 +213,7 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                     <Button
                         aria-label="decrease frequency"
                         variant="outlined"
-                        size="small"
+                        size={ bp }
                         color="primary"
                         onMouseDown={() => startRepeat(dec)}
                         onMouseUp={stopRepeat}
@@ -257,7 +260,7 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                     <Button
                         aria-label="increase frequency"
                         variant="outlined"
-                        size="small"
+                        size={ bp }
                         color="primary"
                         onMouseDown={() => startRepeat(inc)}
                         onMouseUp={stopRepeat}
@@ -288,12 +291,9 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
             </Box>
 
             <Box display="flex" justifyContent="space-between" width="100%">
-              <span style={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }}>
-                {min} Hz
-              </span>
-              <span style={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }}>
-                {max} Hz
-              </span>
+                <Typography variant="caption" color="textSecondary" sx={{ fontSize: 13 }} >{min} Hz</Typography>
+
+                <Typography variant="caption" color="textSecondary" sx={{ fontSize: 13 }} >{max} Hz</Typography>
             </Box>
 
         </Box>

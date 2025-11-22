@@ -1,6 +1,7 @@
 import React from "react";
 import { Button, ButtonProps } from "@mui/material";
 import { setSavedFrequencies } from "../state/savedFrequencies";
+import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 export type SavedFreqFileImporterProps = {
     label?: string;
@@ -8,7 +9,7 @@ export type SavedFreqFileImporterProps = {
 };
 
 const SavedFreqFileImporter: React.FC<SavedFreqFileImporterProps> = ({
-                                                                         label = "Import saved frequencies",
+                                                                         label = "Import",
                                                                          buttonProps,
                                                                      }) => {
     const inputRef = React.useRef<HTMLInputElement | null>(null);
@@ -53,6 +54,12 @@ const SavedFreqFileImporter: React.FC<SavedFreqFileImporterProps> = ({
         []
     );
 
+    const [bp, setBp] = React.useState(getBreakpoint());
+
+    React.useEffect(() => {
+        return subscribeBreakpoint(setBp);
+    }, []);
+
     return (
         <>
             <input
@@ -66,7 +73,8 @@ const SavedFreqFileImporter: React.FC<SavedFreqFileImporterProps> = ({
                 variant="outlined"
                 color="primary"
                 onClick={handleClick}
-                sx={{ whiteSpace: "nowrap", textTransform: "none" }}
+                size={bp}
+                sx={{ whiteSpace: "nowrap" }}
                 {...buttonProps}
             >
                 {label}

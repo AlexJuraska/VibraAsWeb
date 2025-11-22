@@ -8,11 +8,11 @@ import {
 import FileExporter from "../components/SavedFreqFileExporter";
 import SavedFreqFileImporter from "../components/SavedFreqFileImporter";
 import {Box, Button, List, ListItemButton, Paper, Typography} from "@mui/material";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
+import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 export default function SavedFrequencyDropdown() {
     const [currentFreq, setCurrentFreq] = React.useState<number>(0);
@@ -73,6 +73,12 @@ export default function SavedFrequencyDropdown() {
         [savedFrequencies, currentFreq]
     );
 
+    const [bp, setBp] = React.useState(getBreakpoint());
+
+    React.useEffect(() => {
+        return subscribeBreakpoint(setBp);
+    }, []);
+
     if (savedFrequencies.length === 0) {
         return (
             <Box display="flex" flexDirection="column" gap={1}>
@@ -81,11 +87,19 @@ export default function SavedFrequencyDropdown() {
                     with saved frequencies.
                 </Typography>
 
-                <Button variant="contained" color="primary" onClick={addCurrentFrequency}>
+                <Button variant="contained"
+                        color="primary"
+                        onClick={addCurrentFrequency}
+                        sx={{ flex: 1, whiteSpace: "nowrap" }}>
                     Save Current Frequency
                 </Button>
 
-                <SavedFreqFileImporter />
+                <SavedFreqFileImporter
+                    label={"Import saved frequencies"}
+                    buttonProps={{
+                        sx: { flex: 1, whiteSpace: "nowrap" }
+                    }}
+                />
             </Box>
         );
     }
@@ -103,7 +117,7 @@ export default function SavedFrequencyDropdown() {
                     value={currentFreq}
                     label={`Saved Frequencies (${savedFrequencies.length})`}
                     onChange={(e) => onSelectFrequency(Number(e.target.value))}
-                >
+                    variant={"outlined"}>
                     {savedFrequencies.map((freq) => (
                         <MenuItem key={freq} value={freq}>
                             {freq} Hz {freq === currentFreq ? "(current)" : ""}
@@ -134,7 +148,7 @@ export default function SavedFrequencyDropdown() {
                                     onClick={() => onSelectFrequency(freq)}
                                     selected={isCurrent}
                                 >
-                                    <Typography variant="body2">
+                                    <Typography>
                                         {freq} Hz{isCurrent ? " (current)" : ""}
                                     </Typography>
                                 </ListItemButton>
@@ -149,7 +163,8 @@ export default function SavedFrequencyDropdown() {
                 color="primary"
                 onClick={addCurrentFrequency}
                 fullWidth
-                sx={{ whiteSpace: "nowrap" }}
+                size={bp}
+                sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}
             >
                 Save current frequency
             </Button>
@@ -162,7 +177,6 @@ export default function SavedFrequencyDropdown() {
                 />
 
                 <FileExporter
-                    label="Export saved frequencies"
                     fileName="frequencies.txt"
                     getContent={() =>
                         getSavedFrequencies()

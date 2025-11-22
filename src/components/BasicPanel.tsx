@@ -30,7 +30,7 @@ const BasicPanel: React.FC<BasicPanelProps> = ({
                 alignItems: "stretch",
                 justifyContent: "flex-start",
                 overflowY: "auto",
-                padding: theme.spacing(3),
+                padding: theme.spacing(2),
                 gap: theme.spacing(2),
             }}
         >

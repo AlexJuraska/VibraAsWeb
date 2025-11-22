@@ -1,5 +1,6 @@
 import React from "react";
 import { Button, ButtonProps } from "@mui/material";
+import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 export type FileExporterProps = {
     getContent: () => string;
@@ -30,12 +31,19 @@ const SavedFreqFileExporter: React.FC<FileExporterProps> = ({
         URL.revokeObjectURL(url);
     }, [getContent, fileName]);
 
+    const [bp, setBp] = React.useState(getBreakpoint());
+
+    React.useEffect(() => {
+        return subscribeBreakpoint(setBp);
+    }, []);
+
     return (
         <Button
             variant="outlined"
             color="primary"
             onClick={handleExport}
             disabled={disabled}
+            size={bp}
             {...buttonProps}
         >
             {label}
