@@ -5,7 +5,6 @@ import type {ChartDataProps} from "../../../components/Graph";
 import {pause, play, subscribe} from "../state/startStopBus";
 import {publishAudioElement} from "../state/audioOutputBus";
 import {getGain, subscribeGain} from "../state/gainBus";
-import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 type Props = {
     frequency?: number;

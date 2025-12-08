@@ -4,14 +4,12 @@ import { Suspense, lazy } from "react";
 import Home from "./pages/Home";
 import { Box, CircularProgress } from "@mui/material";
 import NotFound from "./pages/NotFound";
-import { breakpointListener } from "./state/breakpointBus";
 
 const ChladniExp = lazy(() => import("./experiments/chladniPatterns"));
 const LaserExp = lazy(() => import("./experiments/laserVibrometer"));
 const GraphTest = lazy(() => import("./components/graphTest"));
 
 function App() {
-    breakpointListener();
     return (
         <Box display="flex" flexDirection="column" minHeight="100vh">
             <Box flex={1}>

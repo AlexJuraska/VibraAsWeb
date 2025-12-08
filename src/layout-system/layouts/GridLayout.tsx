@@ -1,15 +1,15 @@
 import React from "react";
 import {Box, useMediaQuery, useTheme} from "@mui/material";
 import { LayoutConfig } from "../types/LayoutConfig";
-import * as GenericComponents from "../../components";
-import * as ChladniComponents from "../../experiments/chladniPatterns/components";
-import ColorBlock from "../../components/ColorBlock";
+import { ComponentMap } from "../types/ComponentMap";
 
-const AppComponents = { ...GenericComponents, ...ChladniComponents, ColorBlock };
+interface GridLayoutProps {
+    config: LayoutConfig;
+    components: ComponentMap;
+}
 
-export const GridLayout: React.FC<{ config: LayoutConfig }> = ({ config }) => {
+export const GridLayout: React.FC<GridLayoutProps> = ({ config, components }) => {
     const { zones, grid } = config;
-
     const theme = useTheme();
 
     const isXlUp = useMediaQuery(theme.breakpoints.up("xl"));
@@ -30,35 +30,7 @@ export const GridLayout: React.FC<{ config: LayoutConfig }> = ({ config }) => {
         return null;
     }
 
-    const activeAreas = Array.from(
-        new Set(gridVariant.areas.flat())
-    );
-
-    const renderZone = (name: string) => {
-        const zone = zones[name];
-        if (!zone) return null;
-
-        if (!activeAreas.includes(name)) {
-            return null;
-        }
-
-        const Component = (AppComponents as any)[zone.component];
-        if (!Component) {
-            console.warn(`Component '${zone.component}' not found.`);
-            return null;
-        }
-        return (
-            <Box
-                key={name}
-                gridArea={name}
-                sx={{
-                    overflow: "hidden"
-                }}
-            >
-                <Component {...(zone.props || {})} />
-            </Box>
-        );
-    };
+    const activeAreas = new Set(gridVariant.areas.flat());
 
     return (
         <Box
@@ -70,10 +42,26 @@ export const GridLayout: React.FC<{ config: LayoutConfig }> = ({ config }) => {
                 height: "100vh",
                 width: "100vw",
                 overflow: "hidden",
-                boxSizing: "border-box",
             }}
         >
-            {Object.keys(zones).map(name => renderZone(name))}
+            {Object.entries(zones).map(([name, zone]) => {
+                if (!activeAreas.has(name)) return null;
+
+                const Component = components[zone.component];
+                if (!Component) {
+                    console.warn(`Component '${zone.component}' not found`);
+                    return null;
+                }
+
+                return (
+                    <Box key={name} gridArea={name} sx={{ overflow: "hidden", position: "relative" }}>
+                        <Component
+                            {...(zone.props || {})}
+                            components={components}
+                        />
+                    </Box>
+                );
+            })}
         </Box>
     );
 };

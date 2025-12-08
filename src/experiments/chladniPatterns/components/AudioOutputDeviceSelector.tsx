@@ -14,7 +14,6 @@ import {
 import type {SelectChangeEvent} from "@mui/material/Select";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import {subscribeAudioElement} from "../state/audioOutputBus";
-import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 type Props = {
     audioRef?: React.RefObject<HTMLAudioElement>;
@@ -148,18 +147,12 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
         ? "Output device switching is not supported in this browser."
         : undefined;
 
-    const [bp, setBp] = React.useState(getBreakpoint());
-
-    React.useEffect(() => {
-        return subscribeBreakpoint(setBp);
-    }, []);
-
     return (
         <Box className={className} style={style}>
             <Stack direction="row" spacing={1} alignItems="center">
                 <Tooltip title={disabledReason || ""} disableHoverListener={supportsSetSinkId}>
                     <FormControl
-                        variant="outlined" size={bp} fullWidth={fullWidth} disabled={disabled}
+                        variant="outlined" fullWidth={fullWidth} disabled={disabled}
                         // sx={{ '& .MuiInputBase-input': { fontSize: fontSize }, '& .MuiInputLabel-root': { fontSize: fontSize } }}
                         >
                         <InputLabel id="audio-output-label">{label}</InputLabel>
@@ -169,7 +162,6 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                             label={label}
                             value={selected}
                             onChange={onChange}
-                            size={bp}
                         >
                             {devices.map((d) => (
                                 <MenuItem key={d.deviceId} value={d.deviceId}>
@@ -187,7 +179,6 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                 aria-label="refresh devices"
                 onClick={() => { void refreshDevices(); }}
                 disabled={loading}
-                size={bp}
             >
               {loading ? <CircularProgress size={20} /> : <RefreshIcon />}
             </IconButton>

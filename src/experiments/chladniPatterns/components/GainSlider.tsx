@@ -43,7 +43,7 @@ const GainSlider: React.FC<GainSliderProps> = ({
 
     return (
         <Box>
-            <Typography variant="caption" color="textSecondary" >
+            <Typography variant="body2" color="textSecondary" >
                 {label}: {format(displayValue)}
             </Typography>
             <Slider

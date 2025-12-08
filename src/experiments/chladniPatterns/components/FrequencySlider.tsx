@@ -2,7 +2,6 @@ import React from "react";
 import {Box, Slider, Button, TextField, InputAdornment, Typography} from "@mui/material";
 import type { TextFieldProps } from "@mui/material/TextField";
 import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
-import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 type FrequencySliderProps = {
     value: number;
@@ -178,12 +177,6 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
         };
     }, []);
 
-    const [bp, setBp] = React.useState(getBreakpoint());
-
-    React.useEffect(() => {
-        return subscribeBreakpoint(setBp);
-    }, []);
-
     return (
         <Box display="flex" flexDirection="column" gap={1} width="100%">
 
@@ -191,7 +184,6 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                 <TextField
                     label={label}
                     type="number"
-                    size={ bp }
                     color={color}
                     disabled={disabled}
                     value={input}
@@ -213,7 +205,7 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                     <Button
                         aria-label="decrease frequency"
                         variant="outlined"
-                        size={ bp }
+                        size="small"
                         color="primary"
                         onMouseDown={() => startRepeat(dec)}
                         onMouseUp={stopRepeat}
@@ -229,9 +221,6 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                         }}
                         disabled={!!disabled || value <= min}
                         sx={{
-                            width: 36,
-                            height: 36,
-                            minWidth: 36,
                             p: 0,
                             display: "flex",
                             alignItems: "center",
@@ -253,14 +242,14 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                     }}
                     disabled={disabled}
                     aria-label={label}
-                    sx={{ flex: 1, py: 0 }}
+                    sx={{ flex: 1 }}
                 />
 
                 {showStepButtons && (
                     <Button
                         aria-label="increase frequency"
                         variant="outlined"
-                        size={ bp }
+                        size="small"
                         color="primary"
                         onMouseDown={() => startRepeat(inc)}
                         onMouseUp={stopRepeat}
@@ -276,9 +265,6 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                         }}
                         disabled={!!disabled || value >= max}
                         sx={{
-                            width: 36,
-                            height: 36,
-                            minWidth: 36,
                             p: 0,
                             display: "flex",
                             alignItems: "center",

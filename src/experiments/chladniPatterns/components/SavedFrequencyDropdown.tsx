@@ -12,7 +12,6 @@ import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
-import {getBreakpoint, subscribeBreakpoint} from "../../../state/breakpointBus";
 
 export default function SavedFrequencyDropdown() {
     const [currentFreq, setCurrentFreq] = React.useState<number>(0);
@@ -73,12 +72,6 @@ export default function SavedFrequencyDropdown() {
         [savedFrequencies, currentFreq]
     );
 
-    const [bp, setBp] = React.useState(getBreakpoint());
-
-    React.useEffect(() => {
-        return subscribeBreakpoint(setBp);
-    }, []);
-
     if (savedFrequencies.length === 0) {
         return (
             <Box display="flex" flexDirection="column" gap={1}>
@@ -90,14 +83,14 @@ export default function SavedFrequencyDropdown() {
                 <Button variant="contained"
                         color="primary"
                         onClick={addCurrentFrequency}
-                        sx={{ flex: 1, whiteSpace: "nowrap" }}>
+                        sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}>
                     Save Current Frequency
                 </Button>
 
                 <SavedFreqFileImporter
                     label={"Import saved frequencies"}
                     buttonProps={{
-                        sx: { flex: 1, whiteSpace: "nowrap" }
+                        sx: { flex: 1, textTransform: "none", whiteSpace: "nowrap" }
                     }}
                 />
             </Box>
@@ -163,16 +156,20 @@ export default function SavedFrequencyDropdown() {
                 color="primary"
                 onClick={addCurrentFrequency}
                 fullWidth
-                size={bp}
                 sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}
             >
                 Save current frequency
             </Button>
 
-            <Box display="flex" gap={1}>
+            <Box
+                display="flex"
+                gap={1}
+                flexDirection={{ xs: "column", sm: "column", md: "column", lg: "row" }}
+            >
                 <SavedFreqFileImporter
                     buttonProps={{
-                        sx: { flex: 1, textTransform: "none", whiteSpace: "nowrap" }
+                        fullWidth: true,
+                        sx: { textTransform: "none", whiteSpace: "nowrap" }
                     }}
                 />
 
@@ -187,7 +184,8 @@ export default function SavedFrequencyDropdown() {
                     buttonProps={{
                         variant: "outlined",
                         color: "primary",
-                        sx: { flex: 1, textTransform: "none", whiteSpace: "nowrap" }
+                        fullWidth: true,
+                        sx: { textTransform: "none", whiteSpace: "nowrap" }
                     }}
                 />
             </Box>
