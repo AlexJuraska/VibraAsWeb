@@ -6,15 +6,40 @@
       "props": {
         "collapsed": true,
         "children": [
-          { "component": "AudioOutputDeviceSelector", "props": { "size": "medium"} },
-          { "component": "GainSlider", "props": {} },
-          { "component": "StartStopButton", "props": {} },
-          { "component": "ToneController", "props": { "label": "chladni" } },
-          { "component": "SavedFrequencyDropdown", "props": {} },
-          { "component": "HomeButton", "props": { "to": "/", "color": "primary" } }
+          {
+            "component": "AudioOutputDeviceSelector",
+            "props": {}
+          },
+          {
+            "component": "GainSlider",
+            "props": {}
+          },
+          {
+            "component": "StartStopButton",
+            "props": {
+              "width": "100%"
+            }
+          },
+          {
+            "component": "ToneController",
+            "props": {}
+          },
+          {
+            "component": "SavedFrequencyDropdown",
+            "props": {}
+          },
+          {
+            "component": "HomeButton",
+            "props": {
+              "to": "/",
+              "color": "primary",
+              "placement": "bottom"
+            }
+          }
         ]
       }
     },
+
     "mainContent": {
       "component": "OscillogramGraph",
       "props": {
@@ -24,18 +49,20 @@
         }
       }
     },
+
     "leftPanel": {
       "component": "BasicPanel",
       "props": {
         "children": [
-          { "component": "AudioOutputDeviceSelector", "props": { "size": "medium"} },
+          { "component": "AudioOutputDeviceSelector", "props": {} },
           { "component": "GainSlider", "props": {} },
-          { "component": "StartStopButton", "props": {} },
-          { "component": "ToneController", "props": { "label": "chladni" } },
+          { "component": "StartStopButton", "props": { "width": "40%" } },
+          { "component": "ToneController", "props": {} },
           { "component": "SavedFrequencyDropdown", "props": {} }
         ]
       }
     },
+
     "homeButton": {
       "component": "HomeButton",
       "props": {
@@ -44,6 +71,7 @@
       }
     }
   },
+
   "grid": {
     "xs": {
       "areas": [
@@ -51,14 +79,15 @@
         ["mainContent"]
       ],
       "columns": ["1fr"],
-      "rows": ["60px", "1fr"]
+      "rows": ["6%", "1fr"]
     },
-    "xl": {
+
+    "lg": {
       "areas": [
         ["leftPanel", "mainContent"],
         ["homeButton", "mainContent"]
       ],
-      "columns": ["2fr", "8fr"],
+      "columns": ["2.1fr", "8fr"],
       "rows": ["1fr", "80px"]
     }
   }

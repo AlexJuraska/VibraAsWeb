@@ -8,7 +8,7 @@ export type SavedFreqFileImporterProps = {
 };
 
 const SavedFreqFileImporter: React.FC<SavedFreqFileImporterProps> = ({
-                                                                         label = "Import saved frequencies",
+                                                                         label = "Import",
                                                                          buttonProps,
                                                                      }) => {
     const inputRef = React.useRef<HTMLInputElement | null>(null);
@@ -66,7 +66,7 @@ const SavedFreqFileImporter: React.FC<SavedFreqFileImporterProps> = ({
                 variant="outlined"
                 color="primary"
                 onClick={handleClick}
-                sx={{ whiteSpace: "nowrap", textTransform: "none" }}
+                sx={{ whiteSpace: "nowrap" }}
                 {...buttonProps}
             >
                 {label}

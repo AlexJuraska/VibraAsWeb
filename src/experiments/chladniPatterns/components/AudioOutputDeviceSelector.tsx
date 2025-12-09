@@ -1,14 +1,17 @@
 import React from "react";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import Select, {SelectChangeEvent} from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import FormHelperText from "@mui/material/FormHelperText";
-import CircularProgress from "@mui/material/CircularProgress";
+import {
+    Box,
+    CircularProgress,
+    FormControl,
+    FormHelperText,
+    IconButton,
+    InputLabel,
+    MenuItem,
+    Select,
+    Stack,
+    Tooltip,
+} from "@mui/material";
+import type {SelectChangeEvent} from "@mui/material/Select";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import {subscribeAudioElement} from "../state/audioOutputBus";
 
@@ -19,7 +22,6 @@ type Props = {
     style?: React.CSSProperties;
     label?: string;
     storageKey?: string;
-    size?: "small" | "medium";
     fullWidth?: boolean;
 };
 
@@ -41,7 +43,6 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                                                                style,
                                                                label = "Output device",
                                                                storageKey = "audio.sinkId",
-                                                               size = "medium",
                                                                fullWidth = true,
                                                            }) => {
     const [devices, setDevices] = React.useState<OutputDevice[]>([]);
@@ -147,12 +148,13 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
         : undefined;
 
     return (
-        <Box className={className} style={style} sx={{ minWidth: 260 }}>
+        <Box className={className} style={style}>
             <Stack direction="row" spacing={1} alignItems="center">
                 <Tooltip title={disabledReason || ""} disableHoverListener={supportsSetSinkId}>
                     <FormControl
-                        variant="outlined" size={size} fullWidth={fullWidth} disabled={disabled}
-                        sx={{ '& .MuiInputBase-input': { fontSize: 18 }, '& .MuiInputLabel-root': { fontSize: 18 } }}>
+                        variant="outlined" fullWidth={fullWidth} disabled={disabled}
+                        // sx={{ '& .MuiInputBase-input': { fontSize: fontSize }, '& .MuiInputLabel-root': { fontSize: fontSize } }}
+                        >
                         <InputLabel id="audio-output-label">{label}</InputLabel>
                         <Select
                             labelId="audio-output-label"
@@ -162,7 +164,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                             onChange={onChange}
                         >
                             {devices.map((d) => (
-                                <MenuItem key={d.deviceId} value={d.deviceId} sx={{ fontSize: 18 }}>
+                                <MenuItem key={d.deviceId} value={d.deviceId}>
                                     {d.label || (d.deviceId === "default" ? "System default" : "Audio device")}
                                 </MenuItem>
                             ))}
@@ -177,7 +179,6 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                 aria-label="refresh devices"
                 onClick={() => { void refreshDevices(); }}
                 disabled={loading}
-                size={size === "small" ? "small" : "medium"}
             >
               {loading ? <CircularProgress size={20} /> : <RefreshIcon />}
             </IconButton>

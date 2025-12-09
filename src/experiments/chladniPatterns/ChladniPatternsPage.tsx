@@ -1,12 +1,13 @@
 import React from "react";
-import {LayoutRenderer} from "../../layout-system/LayoutRenderer";
-import type { LayoutConfig } from "../../layout-system/types/LayoutConfig";
-import layout from "../../configs/chladniPatternsLayout.json";
+import { LayoutRenderer } from "../../layout-system/LayoutRenderer";
+import layoutConfig from "../../configs/chladniPatternsLayout.json";
+import {componentMap} from "../../layout-system/types/ComponentMap";
 
 export function ChladniPatternsPage() {
     return (
         <LayoutRenderer
-            config={layout as LayoutConfig}
+            config={layoutConfig}
+            components={componentMap}
         />
     );
 }

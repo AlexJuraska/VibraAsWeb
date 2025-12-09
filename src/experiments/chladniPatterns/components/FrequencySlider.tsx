@@ -1,5 +1,5 @@
 import React from "react";
-import {Box, Slider, Button, TextField, InputAdornment} from "@mui/material";
+import {Box, Slider, Button, TextField, InputAdornment, Typography} from "@mui/material";
 import type { TextFieldProps } from "@mui/material/TextField";
 import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
 
@@ -178,12 +178,12 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
     }, []);
 
     return (
-        <Box display="flex" flexDirection="column" gap={1} sx={{ width: '100%' }}>
-            <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', boxSizing: 'border-box' }}>
+        <Box display="flex" flexDirection="column" gap={1} width="100%">
+
+            <Box display="flex" justifyContent="center" width="100%">
                 <TextField
                     label={label}
                     type="number"
-                    size="medium"
                     color={color}
                     disabled={disabled}
                     value={input}
@@ -191,7 +191,6 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                     onFocus={() => setEditing(true)}
                     onBlur={commitInput}
                     onKeyDown={onInputKeyDown}
-                    sx={{ '& .MuiInputBase-input': { fontSize: 18 }, '& .MuiInputLabel-root': { fontSize: 18 } }}
                     slotProps={{
                         input: {
                             endAdornment: <InputAdornment position="end">Hz</InputAdornment>,
@@ -201,7 +200,7 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                 />
             </Box>
 
-            <Box display="flex" alignItems="center" gap={0.5}>
+            <Box display="flex" alignItems="center" width="100%" gap={1}>
                 {showStepButtons && (
                     <Button
                         aria-label="decrease frequency"
@@ -221,29 +220,30 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                             dec();
                         }}
                         disabled={!!disabled || value <= min}
+                        sx={{
+                            p: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
                     >
                         -
                     </Button>
                 )}
 
-                <Box flex={1}>
-                    <Slider
-                        value={value}
-                        min={min}
-                        max={max}
-                        step={step}
-                        onChange={(_, newValue) => {
-                            const nv = Array.isArray(newValue) ? (newValue[0] as number) : (newValue as number);
-                            send(nv);
-                        }}
-                        disabled={disabled}
-                        aria-label={label}
-                    />
-                    <Box display="flex" justifyContent="space-between">
-                        <span style={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }}>{min} Hz</span>
-                        <span style={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }}>{max} Hz</span>
-                    </Box>
-                </Box>
+                <Slider
+                    value={value}
+                    min={min}
+                    max={max}
+                    step={step}
+                    onChange={(_, nv) => {
+                        const val = Array.isArray(nv) ? nv[0] : nv;
+                        send(val);
+                    }}
+                    disabled={disabled}
+                    aria-label={label}
+                    sx={{ flex: 1 }}
+                />
 
                 {showStepButtons && (
                     <Button
@@ -264,13 +264,27 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                             inc();
                         }}
                         disabled={!!disabled || value >= max}
+                        sx={{
+                            p: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
                     >
                         +
                     </Button>
                 )}
             </Box>
+
+            <Box display="flex" justifyContent="space-between" width="100%">
+                <Typography variant="caption" color="textSecondary" sx={{ fontSize: 13 }} >{min} Hz</Typography>
+
+                <Typography variant="caption" color="textSecondary" sx={{ fontSize: 13 }} >{max} Hz</Typography>
+            </Box>
+
         </Box>
     );
+
 };
 
 export default FrequencySlider;
