@@ -5,6 +5,7 @@ import type {ChartDataProps} from "../../../components/Graph";
 import {pause, play, subscribe} from "../state/startStopBus";
 import {publishAudioElement} from "../state/audioOutputBus";
 import {getGain, subscribeGain} from "../state/gainBus";
+import {useTranslation} from "../../../i18n/i18n";
 
 type Props = {
     frequency?: number;
@@ -30,6 +31,8 @@ const ToneGenerator: React.FC<Props> = ({
                                             onStop,
                                             onOscillogram,
                                         }) => {
+    const { t } = useTranslation();
+
     const audioCtxRef = React.useRef<AudioContext | null>(null);
     const destRef = React.useRef<MediaStreamAudioDestinationNode | null>(null);
     const audioElRef = React.useRef<HTMLAudioElement | null>(null);
@@ -222,7 +225,7 @@ const ToneGenerator: React.FC<Props> = ({
                 min={min}
                 max={max}
                 step={step}
-                label="Frequency"
+                label={t("experiments.chladni.components.toneGenerator.label", "Frequency")}
                 onChange={onFreqChange}
                 disabled={false}
                 showStepButtons={true}

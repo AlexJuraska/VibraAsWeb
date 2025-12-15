@@ -1,6 +1,8 @@
 import React from "react";
+import {useTranslation} from "../i18n/i18n";
 
 export default function FileDownloader(data: string) {
+    const { t } = useTranslation();
     const handleDownload = () => {
         const file = new Blob([data], { type: 'text/plain' });
         const element = document.createElement('a');
@@ -12,7 +14,7 @@ export default function FileDownloader(data: string) {
 
     return (
         <div>
-            <button onClick={handleDownload}>Download File</button>
+            <button onClick={handleDownload}>{t("components.fileDownloader", "Download File")}</button>
         </div>
     );
 }

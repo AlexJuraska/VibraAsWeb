@@ -12,8 +12,11 @@ import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
+import {useTranslation} from "../../../i18n/i18n";
 
 export default function SavedFrequencyDropdown() {
+    const { t } = useTranslation();
+
     const [currentFreq, setCurrentFreq] = React.useState<number>(0);
     const [savedFrequencies, setSavedFrequencies] = React.useState<number[]>([]);
     const [open, setOpen] = React.useState<boolean>(false);
@@ -61,7 +64,7 @@ export default function SavedFrequencyDropdown() {
     }, []);
 
     const fieldPrimary = React.useMemo(
-        () => `Saved Frequencies${savedFrequencies.length > 0 ? ` (${savedFrequencies.length})` : ""}`,
+        () => `${t("experiments.chladni.components.savedFrequencyDropdown.savedFrequencies", "Saved Frequencies")}${savedFrequencies.length > 0 ? ` (${savedFrequencies.length})` : ""}`,
         [savedFrequencies.length]
     );
     const fieldSecondary = React.useMemo(
@@ -76,19 +79,19 @@ export default function SavedFrequencyDropdown() {
         return (
             <Box display="flex" flexDirection="column" gap={1}>
                 <Typography variant="body2">
-                    You do not have any saved frequencies. You can add more with the button below or import a file
-                    with saved frequencies.
+                    {t("experiments.chladni.components.savedFrequencyDropdown.noSavedFrequencies",
+                        "You do not have any saved frequencies. You can add more with the button below or import a file with saved frequencies.")}
                 </Typography>
 
                 <Button variant="contained"
                         color="primary"
                         onClick={addCurrentFrequency}
                         sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}>
-                    Save Current Frequency
+                    {t("experiments.chladni.components.savedFrequencyDropdown.saveFrequency", "Save Current Frequency")}
                 </Button>
 
                 <SavedFreqFileImporter
-                    label={"Import saved frequencies"}
+                    label={t("experiments.chladni.components.savedFrequencyDropdown.import", "Import saved frequencies")}
                     buttonProps={{
                         sx: { flex: 1, textTransform: "none", whiteSpace: "nowrap" }
                     }}
@@ -102,18 +105,18 @@ export default function SavedFrequencyDropdown() {
 
             <FormControl fullWidth>
                 <InputLabel id="saved-freqs-label">
-                    Saved Frequencies ({savedFrequencies.length})
+                    {t("experiments.chladni.components.savedFrequencyDropdown.savedFrequencies", "Saved Frequencies")} ({savedFrequencies.length})
                 </InputLabel>
 
                 <Select
                     labelId="saved-freqs-label"
                     value={currentFreq}
-                    label={`Saved Frequencies (${savedFrequencies.length})`}
+                    label={`${t("experiments.chladni.components.savedFrequencyDropdown.savedFrequencies", "Saved Frequencies")} (${savedFrequencies.length})`}
                     onChange={(e) => onSelectFrequency(Number(e.target.value))}
                     variant={"outlined"}>
                     {savedFrequencies.map((freq) => (
                         <MenuItem key={freq} value={freq}>
-                            {freq} Hz {freq === currentFreq ? "(current)" : ""}
+                            {freq} Hz {freq === currentFreq ? `${t("experiments.chladni.components.savedFrequencyDropdown.current", "(current)")}` : ""}
                         </MenuItem>
                     ))}
                 </Select>
@@ -158,7 +161,7 @@ export default function SavedFrequencyDropdown() {
                 fullWidth
                 sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}
             >
-                Save current frequency
+                {t("experiments.chladni.components.savedFrequencyDropdown.saveFrequency", "Save Current Frequency")}
             </Button>
 
             <Box

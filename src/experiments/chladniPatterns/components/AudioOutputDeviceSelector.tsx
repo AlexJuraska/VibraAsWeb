@@ -14,6 +14,7 @@ import {
 import type {SelectChangeEvent} from "@mui/material/Select";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import {subscribeAudioElement} from "../state/audioOutputBus";
+import {useTranslation} from "../../../i18n/i18n";
 
 type Props = {
     audioRef?: React.RefObject<HTMLAudioElement>;
@@ -41,10 +42,12 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                                                                onSinkChange,
                                                                className,
                                                                style,
-                                                               label = "Output device",
                                                                storageKey = "audio.sinkId",
                                                                fullWidth = true,
                                                            }) => {
+    const { t } = useTranslation();
+    const label = t("experiments.chladni.components.audioOutputSelector.label", "Audio Output Device");
+
     const [devices, setDevices] = React.useState<OutputDevice[]>([]);
     const [selected, setSelected] = React.useState<string>(() => {
         return typeof window !== "undefined"
@@ -102,7 +105,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
             setDevices(withDefault);
             setError(null);
         } catch {
-            setError("Failed to enumerate audio output devices.");
+            setError(t("experiments.chladni.components.audioOutputSelector.enumerateError", "Failed to enumerate audio output devices."));
         } finally {
             setLoading(false);
         }
@@ -144,7 +147,8 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
 
     const disabled = !supportsSetSinkId || loading;
     const disabledReason = !supportsSetSinkId
-        ? "Output device switching is not supported in this browser."
+        ? t("experiments.chladni.components.audioOutputSelector.browserNotSupported",
+            "Output device switching is not supported in this browser.")
         : undefined;
 
     return (
@@ -153,7 +157,6 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                 <Tooltip title={disabledReason || ""} disableHoverListener={supportsSetSinkId}>
                     <FormControl
                         variant="outlined" fullWidth={fullWidth} disabled={disabled}
-                        // sx={{ '& .MuiInputBase-input': { fontSize: fontSize }, '& .MuiInputLabel-root': { fontSize: fontSize } }}
                         >
                         <InputLabel id="audio-output-label">{label}</InputLabel>
                         <Select
@@ -165,7 +168,9 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                         >
                             {devices.map((d) => (
                                 <MenuItem key={d.deviceId} value={d.deviceId}>
-                                    {d.label || (d.deviceId === "default" ? "System default" : "Audio device")}
+                                    {d.label || (d.deviceId === "default" ?
+                                        t("experiments.chladni.components.audioOutputSelector.defaultAudio", "System default") :
+                                        t("experiments.chladni.components.audioOutputSelector.audioDevice", "Audio device"))}
                                 </MenuItem>
                             ))}
                         </Select>
@@ -173,7 +178,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                     </FormControl>
                 </Tooltip>
 
-                <Tooltip title="Refresh devices">
+                <Tooltip title={t("experiments.chladni.components.audioOutputSelector.refresh", "Refresh devices")}>
           <span>
             <IconButton
                 aria-label="refresh devices"

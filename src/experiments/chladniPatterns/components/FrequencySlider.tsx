@@ -2,6 +2,7 @@ import React from "react";
 import {Box, Slider, Button, TextField, InputAdornment, Typography} from "@mui/material";
 import type { TextFieldProps } from "@mui/material/TextField";
 import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
+import {useTranslation} from "../../../i18n/i18n";
 
 type FrequencySliderProps = {
     value: number;
@@ -21,13 +22,14 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                                                              min = 80,
                                                              max = 2000,
                                                              step = 1,
-                                                             label = "Frequency",
                                                              disabled,
                                                              format: _format,
                                                              onChange,
                                                              showStepButtons = false,
                                                              color = "primary",
                                                          }) => {
+    const { t } = useTranslation();
+    const label = t("experiments.chladni.components.frequencySlider.label", "Frequency");
 
     const [input, setInput] = React.useState<string>(String(Math.round(value)));
     const [editing, setEditing] = React.useState(false);

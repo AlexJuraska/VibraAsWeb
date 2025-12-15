@@ -1,8 +1,9 @@
-import React from "react";
+import React, {use} from "react";
 import Slider from "@mui/material/Slider";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import { getGain, publishGain, subscribeGain } from "../state/gainBus";
+import {useTranslation} from "../../../i18n/i18n";
 
 type GainSliderProps = {
     value?: number;
@@ -20,11 +21,13 @@ const GainSlider: React.FC<GainSliderProps> = ({
                                                    min = 0,
                                                    max = 0.5,
                                                    step = 0.01,
-                                                   label = "Gain",
                                                    disabled = false,
                                                    onChange,
                                                    format = (v) => (Number.isFinite(v) ? v.toFixed(2) : "0.00"),
                                                }) => {
+    const { t } = useTranslation();
+    const label = t("experiments.chladni.components.gainSlider.label", "Gain");
+
     const [busVal, setBusVal] = React.useState<number>(() => getGain());
 
     React.useEffect(() => {

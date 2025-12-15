@@ -1,20 +1,24 @@
-import {Box, Card, CardContent, Grid, Typography} from "@mui/material";
+import { Box, Card, CardContent, Grid, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "../i18n/i18n";
+import LanguageSelector from "../components/LanguageSelector";
 
-function Home() {
+export default function Home() {
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const experiments = [
-        { title: "Chladni's Patterns", path: "/experiments/chladniPatterns" },
-        { title: "Laser Vibrometer", path: "/experiments/laserVibrometer" },
-        { title: "Graph Test", path: "/components/graphTest" },
+        { titleKey: "home.experiment_chladni", title: "Chladni's Patterns", path: "/experiments/chladniPatterns" },
+//        { titleKey: "home.experiment_laser", title: "Laser Vibrometer", path: "/experiments/laserVibrometer" },
+//        { titleKey: "home.experiment_graph", title: "Graph Test", path: "/components/graphTest" },
     ];
 
     return (
         <Box display="flex" flexDirection="column" alignItems="center" gap={3} mt={6}>
-            <Typography variant="h3">Welcome to VibraAS</Typography>
+            <LanguageSelector></LanguageSelector>
+            <Typography variant="h3">{t("home.welcome", "Welcome to VibraAS")}</Typography>
             <Typography variant="subtitle1" color="text.secondary">
-                Choose an experiment to explore
+                {t("home.choose_experiment", "Choose an experiment to explore")}
             </Typography>
 
             <Grid container spacing={3} justifyContent="center" maxWidth="md">
@@ -29,7 +33,7 @@ function Home() {
                             }}
                         >
                             <CardContent>
-                                <Typography variant="h6">{exp.title}</Typography>
+                                <Typography variant="h6">{t(exp.titleKey, exp.title)}</Typography>
                             </CardContent>
                         </Card>
                     </Grid>
@@ -38,5 +42,3 @@ function Home() {
         </Box>
     );
 }
-
-export default Home;
