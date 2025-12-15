@@ -7,6 +7,7 @@ import {
     IconButton,
     InputLabel,
     MenuItem,
+    OutlinedInput,
     Select,
     Stack,
     Tooltip,
@@ -162,7 +163,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                         <Select
                             labelId="audio-output-label"
                             id="audio-output-select"
-                            label={label}
+                            input={<OutlinedInput label={label} />}
                             value={selected}
                             onChange={onChange}
                         >
