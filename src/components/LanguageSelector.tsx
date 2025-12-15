@@ -1,5 +1,7 @@
 import React from 'react';
 import { useTranslation, Language } from '../i18n/i18n';
+import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 
 const LANG_LABELS: Record<Language, string> = {
     en: 'English',
@@ -10,21 +12,30 @@ const LANG_LABELS: Record<Language, string> = {
 export default function LanguageSelector() {
     const { lang, setLanguage, t } = useTranslation();
 
-    const onChange: React.ChangeEventHandler<HTMLSelectElement> = (e) => {
+    const handleChange = (e: SelectChangeEvent<string>) => {
         setLanguage(e.target.value as Language);
     };
 
     return (
-        <label style={{ display: 'inline-flex', alignSelf: "flex-end", gap: 8 }}>
-            <span style={{ fontSize: 12 }}>{t('components.languageSelector', 'Lang')}:</span>
-            <select
+        <FormControl
+            size="small"
+            variant="standard"
+            sx={{ minWidth: 140, alignSelf: 'flex-end', gap: 1 }}
+        >
+            <InputLabel id="language-select-label" sx={{ fontSize: 12 }}>
+                {t('components.languageSelector', 'Lang')}
+            </InputLabel>
+            <Select
+                labelId="language-select-label"
+                id="language-select"
                 value={lang}
-                onChange={onChange}
+                label={t('components.languageSelector', 'Lang')}
+                onChange={handleChange}
             >
-                <option value="en">{LANG_LABELS.en}</option>
-                <option value="sk">{LANG_LABELS.sk}</option>
-                <option value="cz">{LANG_LABELS.cz}</option>
-            </select>
-        </label>
+                <MenuItem value="en">{LANG_LABELS.en}</MenuItem>
+                <MenuItem value="sk">{LANG_LABELS.sk}</MenuItem>
+                <MenuItem value="cz">{LANG_LABELS.cz}</MenuItem>
+            </Select>
+        </FormControl>
     );
 }
