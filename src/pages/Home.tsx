@@ -2,10 +2,13 @@ import { Box, Card, CardContent, Grid, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "../i18n/i18n";
 import LanguageSelector from "../components/LanguageSelector";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 export default function Home() {
     const navigate = useNavigate();
     const { t } = useTranslation();
+
+    usePageTitle(undefined, "VibraAS");
 
     const experiments = [
             { titleKey: "home.experiment_chladni", title: "Chladni's Patterns", path: "/experiments/chladniPatterns" },
