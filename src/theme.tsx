@@ -12,6 +12,67 @@ const fluidDesktop = {
     icon: "clamp(18px, 1.8vw, 22px)",
 };
 
+const fluidTypography = {
+    h1: {
+        mobile: "clamp(2.2rem, 8vw, 2.8rem)",
+        desktop: "clamp(1.8rem, 3vw, 2.2rem)",
+    },
+    h2: {
+        mobile: "clamp(1.9rem, 6.5vw, 2.4rem)",
+        desktop: "clamp(1.5rem, 2.5vw, 1.9rem)",
+    },
+    h3: {
+        mobile: "clamp(1.6rem, 5.5vw, 2rem)",
+        desktop: "clamp(1.3rem, 2vw, 1.6rem)",
+    },
+    h4: {
+        mobile: "clamp(1.35rem, 4.5vw, 1.6rem)",
+        desktop: "clamp(1.15rem, 1.6vw, 1.35rem)",
+    },
+    h5: {
+        mobile: "clamp(1.2rem, 4vw, 1.35rem)",
+        desktop: "clamp(1.05rem, 1.4vw, 1.15rem)",
+    },
+    h6: {
+        mobile: "clamp(1.05rem, 3.5vw, 1.2rem)",
+        desktop: "clamp(0.95rem, 1.2vw, 1.05rem)",
+    },
+
+    body1: {
+        mobile: fluidMobile.font,
+        desktop: fluidDesktop.font,
+    },
+    body2: {
+        mobile: "clamp(0.95rem, 4.5vw, 1.05rem)",
+        desktop: "clamp(0.8rem, 1.2vw, 0.9rem)",
+    },
+
+    subtitle1: {
+        mobile: "clamp(1rem, 4.5vw, 1.15rem)",
+        desktop: "clamp(0.85rem, 1.3vw, 0.95rem)",
+    },
+    subtitle2: {
+        mobile: "clamp(0.9rem, 4vw, 1rem)",
+        desktop: "clamp(0.75rem, 1.1vw, 0.85rem)",
+    },
+
+    button: {
+        mobile: fluidMobile.font,
+        desktop: fluidDesktop.font,
+    },
+
+    caption: {
+        mobile: "clamp(0.8rem, 3.5vw, 0.9rem)",
+        desktop: "clamp(0.7rem, 1vw, 0.8rem)",
+    },
+
+    overline: {
+        mobile: "clamp(0.75rem, 3vw, 0.85rem)",
+        desktop: "clamp(0.65rem, 0.9vw, 0.75rem)",
+    },
+};
+
+
 const theme = createTheme({
     palette: {
         primary: {
@@ -26,10 +87,70 @@ const theme = createTheme({
     },
 
     typography: {
-        fontSize: 16,
+
+        h1: { fontSize: fluidTypography.h1.mobile, fontWeight: 700 },
+        h2: { fontSize: fluidTypography.h2.mobile, fontWeight: 600 },
+        h3: { fontSize: fluidTypography.h3.mobile, fontWeight: 600 },
+        h4: { fontSize: fluidTypography.h4.mobile, fontWeight: 600 },
+        h5: { fontSize: fluidTypography.h5.mobile, fontWeight: 500 },
+        h6: { fontSize: fluidTypography.h6.mobile, fontWeight: 500 },
+
+        subtitle1: { fontSize: fluidTypography.subtitle1.mobile },
+        subtitle2: { fontSize: fluidTypography.subtitle2.mobile },
+
+        body1: { fontSize: fluidTypography.body1.mobile, lineHeight: 1.6 },
+        body2: { fontSize: fluidTypography.body2.mobile, lineHeight: 1.55 },
+
+        button: {
+            fontSize: fluidTypography.button.mobile,
+            textTransform: "none",
+            fontWeight: 500,
+        },
+
+        caption: { fontSize: fluidTypography.caption.mobile },
+        overline: {
+            fontSize: fluidTypography.overline.mobile,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+        },
     },
 
     components: {
+
+        MuiCssBaseline: {
+            styleOverrides: (theme) => ({
+                [theme.breakpoints.up("lg")]: {
+                    "& h1": { fontSize: fluidTypography.h1.desktop },
+                    "& h2": { fontSize: fluidTypography.h2.desktop },
+                    "& h3": { fontSize: fluidTypography.h3.desktop },
+                    "& h4": { fontSize: fluidTypography.h4.desktop },
+                    "& h5": { fontSize: fluidTypography.h5.desktop },
+                    "& h6": { fontSize: fluidTypography.h6.desktop },
+
+                    "& .MuiTypography-body1": {
+                        fontSize: fluidTypography.body1.desktop,
+                    },
+                    "& .MuiTypography-body2": {
+                        fontSize: fluidTypography.body2.desktop,
+                    },
+                    "& .MuiTypography-subtitle1": {
+                        fontSize: fluidTypography.subtitle1.desktop,
+                    },
+                    "& .MuiTypography-subtitle2": {
+                        fontSize: fluidTypography.subtitle2.desktop,
+                    },
+                    "& .MuiTypography-button": {
+                        fontSize: fluidTypography.button.desktop,
+                    },
+                    "& .MuiTypography-caption": {
+                        fontSize: fluidTypography.caption.desktop,
+                    },
+                    "& .MuiTypography-overline": {
+                        fontSize: fluidTypography.overline.desktop,
+                    },
+                },
+            }),
+        },
 
         MuiButton: {
             styleOverrides: {
@@ -63,14 +184,48 @@ const theme = createTheme({
         MuiSelect: {
             styleOverrides: {
                 select: ({ theme }) => ({
-                    display: "flex",
-                    alignItems: "center",
-                    minHeight: fluidMobile.control,
-                    fontSize: fluidMobile.font,
+                    paddingRight: theme.spacing(4), // space from dropdown icon
 
                     [theme.breakpoints.up("lg")]: {
-                        minHeight: fluidDesktop.control,
-                        fontSize: fluidDesktop.font,
+                        paddingRight: theme.spacing(5),
+                    },
+                }),
+            },
+        },
+
+        MuiInputLabel: {
+            styleOverrides: {
+                outlined: ({ theme }) => ({
+                    fontSize: "0.95em",
+
+                    [theme.breakpoints.up("lg")]: {
+                        fontSize: "0.9em",
+                    },
+                }),
+            },
+        },
+
+        MuiOutlinedInput: {
+            styleOverrides: {
+                root: ({ theme }) => ({
+                    fontSize: "0.95em",
+
+                    [theme.breakpoints.up("lg")]: {
+                        fontSize: "0.9em",
+                    },
+                }),
+            },
+        },
+
+        MuiMenuItem: {
+            styleOverrides: {
+                root: ({ theme }) => ({
+                    fontSize: "0.95em",
+                    minHeight: "2.25em",
+
+                    [theme.breakpoints.up("lg")]: {
+                        fontSize: "0.9em",
+                        minHeight: "2em",
                     },
                 }),
             },
@@ -119,17 +274,34 @@ const theme = createTheme({
             },
         },
 
-        MuiTypography: {
+        MuiCard: {
             styleOverrides: {
                 root: ({ theme }) => ({
-                    fontSize: fluidMobile.font,
+                    borderRadius: 16,
+                    border: "1px solid",
+                    borderColor: theme.palette.divider,
+                    transition: "box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease",
+                    paddingBottom: 3,
 
-                    [theme.breakpoints.up("lg")]: {
-                        fontSize: fluidDesktop.font,
+                    "&:hover": {
+                        boxShadow: theme.shadows[6],
+                        borderColor: theme.palette.primary.main,
+                        transform: "translateY(-2px)",
                     },
                 }),
             },
         },
+
+        MuiCardContent: {
+            styleOverrides: {
+                root: {
+                    padding: "1.5em",
+                    textAlign: "center",
+                },
+            },
+        },
+
+
     },
 });
 

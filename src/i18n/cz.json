@@ -33,7 +33,7 @@
         },
         "graph": {
           "xAxis": "Čas (s)",
-          "yAxis": "Amplitúda"
+          "yAxis": "Amplitúda (a.i.)"
         },
         "savedFrequencyDropdown": {
           "savedFrequencies": "Uložené frekvence",

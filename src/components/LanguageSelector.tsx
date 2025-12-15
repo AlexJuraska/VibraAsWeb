@@ -18,18 +18,21 @@ export default function LanguageSelector() {
 
     return (
         <FormControl
+            variant="outlined"
             size="small"
-            variant="standard"
-            sx={{ minWidth: 140, alignSelf: 'flex-end', gap: 1 }}
+            sx={{
+                minWidth: 160,
+            }}
         >
-            <InputLabel id="language-select-label" sx={{ fontSize: 12 }}>
-                {t('components.languageSelector', 'Lang')}
+            <InputLabel id="language-select-label">
+                {t("components.languageSelector", "Language")}
             </InputLabel>
+
             <Select
                 labelId="language-select-label"
                 id="language-select"
                 value={lang}
-                label={t('components.languageSelector', 'Lang')}
+                label={t("components.languageSelector", "Language")}
                 onChange={handleChange}
             >
                 <MenuItem value="en">{LANG_LABELS.en}</MenuItem>

@@ -33,7 +33,7 @@
       },
         "graph": {
           "xAxis": "Time (s)",
-          "yAxis": "Amplitude"
+          "yAxis": "Amplitude (a.i.)"
         },
         "savedFrequencyDropdown": {
           "savedFrequencies": "Saved Frequencies",
