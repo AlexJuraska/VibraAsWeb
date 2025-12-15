@@ -273,6 +273,35 @@ const theme = createTheme({
                 }),
             },
         },
+
+        MuiCard: {
+            styleOverrides: {
+                root: ({ theme }) => ({
+                    borderRadius: 16,
+                    border: "1px solid",
+                    borderColor: theme.palette.divider,
+                    transition: "box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease",
+                    paddingBottom: 3,
+
+                    "&:hover": {
+                        boxShadow: theme.shadows[6],
+                        borderColor: theme.palette.primary.main,
+                        transform: "translateY(-2px)",
+                    },
+                }),
+            },
+        },
+
+        MuiCardContent: {
+            styleOverrides: {
+                root: {
+                    padding: "1.5em",
+                    textAlign: "center",
+                },
+            },
+        },
+
+
     },
 });
 
