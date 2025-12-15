@@ -5,6 +5,7 @@ import type { ChartDataProps, Dataset, Point } from "../../../components/Graph";
 import { audioSignalBus } from "../state/audioSignalBus";
 import { startStopBus } from "../state/startStopBus";
 import { FIXED_TIME_WINDOW_S } from "./SoundToGraphConvertor";
+import {useTranslation} from "../../../i18n/i18n";
 
 const useRafOffset = (windowSec: number, speed: number) => {
     const [offset, setOffset] = React.useState(0);
@@ -46,6 +47,8 @@ const useRafOffset = (windowSec: number, speed: number) => {
 type Props = { scrollSpeed?: number };
 
 const OscillogramGraph: React.FC<Props> = ({ scrollSpeed = 0.005 }) => {
+    const { t } = useTranslation();
+
     const [rawData, setRawData] = React.useState<ChartDataProps | undefined>(() => audioSignalBus.get());
     React.useEffect(() => {
         const unsubscribe = audioSignalBus.subscribe(setRawData);
@@ -86,8 +89,10 @@ const OscillogramGraph: React.FC<Props> = ({ scrollSpeed = 0.005 }) => {
         animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } },
         plugins: { legend: { display: false } },
         scales: {
-            x: { type: "linear" as const, min: 0, max: FIXED_TIME_WINDOW_S, title: { display: true, text: "Time (s)" } },
-            y: { type: "linear" as const, min: -1, max: 1, title: { display: true, text: "Amplitude" } }
+            x: { type: "linear" as const, min: 0, max: FIXED_TIME_WINDOW_S, title: { display: true,
+                    text: t("experiments.chladni.components.graph.xAxis", "Time (s)") } },
+            y: { type: "linear" as const, min: -1, max: 1, title: { display: true,
+                    text: t("experiments.chladni.components.graph.yAxis", "Amplitude") } }
         }
     }), []);
 

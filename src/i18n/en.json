@@ -1,0 +1,55 @@
+{
+  "home": {
+    "welcome": "Welcome to VibraAS",
+    "choose_experiment": "Choose an experiment to explore",
+    "experiment_chladni": "Chladni's Patterns",
+    "experiment_laser": "Laser Vibrometer",
+    "experiment_graph": "Graph Test"
+  },
+  "notFound": {
+    "notFound": "Page not found"
+  },
+  "components": {
+    "fileDownloader": "Download File",
+    "homeButton": "Home",
+    "languageSelector": "Select Language"
+  },
+  "experiments": {
+    "chladni": {
+      "components": {
+        "audioOutputSelector": {
+          "label": "Audio Output Device",
+          "enumerateError": "Failed to enumerate audio output devices.",
+          "browserNotSupported": "Output device switching is not supported in this browser.",
+          "defaultAudio": "System default",
+          "audioDevice": "Audio Device",
+          "refresh": "Refresh devices"
+        },
+        "frequencySlider": {
+          "label": "Frequency"
+        },
+        "gainSlider": {
+          "label": "Gain"
+      },
+        "graph": {
+          "xAxis": "Time (s)",
+          "yAxis": "Amplitude"
+        },
+        "savedFrequencyDropdown": {
+          "savedFrequencies": "Saved Frequencies",
+          "noSavedFrequencies": "You do not have any saved frequencies. You can add more with the button below or import a file with saved frequencies.",
+          "import": "Import saved frequencies",
+          "saveFrequency": "Save Current Frequency",
+          "current": "(current)"
+        },
+        "startStop": {
+          "stop": "Stop Sound",
+          "start": "Start Sound"
+        },
+        "toneGenerator": {
+          "label": "Frequency"
+        }
+      }
+    }
+  }
+}

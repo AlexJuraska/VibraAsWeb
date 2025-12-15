@@ -1,0 +1,55 @@
+{
+  "home": {
+    "welcome": "Vitajte vo VibraAS",
+    "choose_experiment": "Vyberte experiment na preskúmanie",
+    "experiment_chladni": "Chladniho vzorce",
+    "experiment_laser": "Laser Vibrometer",
+    "experiment_graph": "Graph Test"
+  },
+  "notFound": {
+    "notFound": "Stránka nenájdená"
+  },
+  "components": {
+    "fileDownloader": "Stiahnuť súbor",
+    "homeButton": "Domov",
+    "languageSelector": "Výber jazyka"
+  },
+  "experiments": {
+    "chladni": {
+      "components": {
+        "audioOutputSelector": {
+          "label": "Výstupné audio zariadenie",
+          "enumerateError": "Nepodarilo sa získať zoznam výstupných audio zariadení.",
+          "browserNotSupported": "Výber výstupného zariadenia nie je v tomto prehliadači podporovaný.",
+          "defaultAudio": "Predvolený systémom",
+          "audioDevice": "Audio zariadenie",
+          "refresh": "Obnoviť zariadenia"
+        },
+        "frequencySlider": {
+          "label": "Frekvencia"
+        },
+        "gainSlider": {
+          "label": "Zosílenie"
+        },
+        "graph": {
+          "xAxis": "Čas (s)",
+          "yAxis": "Amplitúda"
+        },
+        "savedFrequencyDropdown": {
+          "savedFrequencies": "Uložené frekvencie",
+          "noSavedFrequencies": "Nemáte žiadne uložené frekvencie. Môžete pridať viac pomocou tlačidla nižšie alebo importovať súbor s uloženými frekvenciami.",
+          "import": "Importovať uložené frekvencie",
+          "saveFrequency": "Uložiť aktuálnu frekvenciu",
+          "current": "(aktuálna)"
+        },
+        "startStop": {
+          "stop": "Zastaviť zvuk",
+          "start": "Pustiť zvuk"
+        },
+        "toneGenerator": {
+          "label": "Frekvencia"
+        }
+      }
+    }
+  }
+}
