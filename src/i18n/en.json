@@ -3,6 +3,7 @@
     "welcome": "Welcome to VibraAS",
     "choose_experiment": "Choose an experiment to explore",
     "experiment_chladni": "Chladni's Patterns",
+    "experiment_audio_analysis": "Audio Analysis",
     "experiment_laser": "Laser Vibrometer",
     "experiment_graph": "Graph Test"
   },
@@ -49,6 +50,35 @@
         "toneGenerator": {
           "label": "Frequency"
         }
+      }
+    },
+    "audioAnalysis": {
+      "components": {
+        "audioInputSelector": {
+          "label": "Audio Input Device",
+          "enumerateError": "Failed to enumerate audio input devices.",
+          "mediaDevicesUnavailable": "Media devices API not available.",
+          "defaultAudio": "System default",
+          "audioDevice": "Audio device",
+          "refresh": "Refresh devices"
+        },
+        "audioRecorder": {
+          "start": "Record",
+          "stop": "Stop Recording",
+          "permissionError": "Microphone access is not available.",
+          "permissionDenied": "Microphone permission denied.",
+          "deviceNotFound": "Selected input device not found.",
+          "startError": "Could not start recording.",
+          "recordingError": "Recording failed.",
+          "decodeError": "Could not decode the recording.",
+          "unsupported": "MediaRecorder is not supported in this browser."
+        },
+        "graph": {
+          "xAxis": "Time (s)",
+          "yAxis": "Amplitude",
+          "empty": "Record audio to see the waveform."
+        }
+
       }
     }
   }

@@ -3,6 +3,7 @@
     "welcome": "Vítejte ve VibraAS",
     "choose_experiment": "Vyberte experiment na prozkoumání",
     "experiment_chladni": "Chladniho vzorce",
+    "experiment_audio_analysis": "Audio analýza",
     "experiment_laser": "Laser Vibrometer",
     "experiment_graph": "Graph Test"
   },
@@ -48,6 +49,34 @@
         },
         "toneGenerator": {
           "label": "Frekvence"
+        }
+      }
+    },
+    "audioAnalysis": {
+      "components": {
+        "audioInputSelector": {
+          "label": "Vstupné audio zařízení",
+          "enumerateError": "Nepodařilo se získat seznam vstupních audio zařízení.",
+          "mediaDevicesUnavailable": "API pro média není dostupné.",
+          "defaultAudio": "Předvolený systémem",
+          "audioDevice": "Audio zařízení",
+          "refresh": "Obnovit zařízení"
+        },
+        "audioRecorder": {
+          "start": "Nahrát",
+          "stop": "Zastavit nahrávání",
+          "permissionError": "Přístup k mikrofonu není dostupný.",
+          "permissionDenied": "Přístup k mikrofonu byl zamítnut.",
+          "deviceNotFound": "Vybrané vstupní zařízení nebylo nalezeno.",
+          "startError": "Nelze spustit nahrávání.",
+          "recordingError": "Nahrávání se nezdařilo.",
+          "decodeError": "Nahrávku se nepodařilo dekódovat.",
+          "unsupported": "MediaRecorder není v tomto prohlížeči podporován."
+        },
+        "graph": {
+          "xAxis": "Čas (s)",
+          "yAxis": "Amplituda",
+          "empty": "Nahrajte audio pro zobrazení průběhu."
         }
       }
     }
