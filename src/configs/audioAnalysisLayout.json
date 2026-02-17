@@ -6,20 +6,23 @@
       "props": {
         "collapsed": true,
         "children": [
-          { "component": "ColorBlock", "props": { "color": "purple", "label":  "Collapsible1"} },
-          { "component": "ColorBlock", "props": {"color":  "blue", "label":  "Collapsible2"} }
+          { "component": "AudioInputDeviceSelector", "props": {} },
+          { "component": "AudioRecordButton", "props": {} },
+          { "component": "AudioRecordingDebug", "props": {} }
         ]
       }
     },
     "mainContent": {
-      "component": "ColorBlock",
-      "props": {"color":  "red", "label":  "Main"}
+      "component": "AudioRecordingGraph",
+      "props": {}
     },
     "leftPanel": {
       "component": "BasicPanel",
       "props": {
         "children": [
-          { "component": "ColorBlock", "props": {"color":  "green", "label":  "LeftPanel1"} },
+          { "component": "AudioInputDeviceSelector", "props": {} },
+          { "component": "AudioRecordButton", "props": {} },
+          { "component": "AudioRecordingDebug", "props": {} },
           { "component": "ColorBlock", "props": {"color":  "orange", "label":  "LeftPanel2"} }
         ]
       }
