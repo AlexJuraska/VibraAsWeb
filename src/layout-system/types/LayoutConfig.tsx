@@ -12,9 +12,18 @@ export interface GridConfig {
     xl?: GridVariant;
 }
 
+export interface ZoneAnimationConfig {
+    exitDirection?: "left" | "right" | "up" | "down";
+    collapse?: {
+        axis: "column" | "row";
+        trackIndex: number;
+    };
+}
+
 export interface ZoneConfig {
     component: string;
     props?: Record<string, any>;
+    animation?: ZoneAnimationConfig;
 }
 
 export interface LayoutConfig {
