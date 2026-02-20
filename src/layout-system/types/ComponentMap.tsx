@@ -4,7 +4,6 @@ import HomeButton from "../../components/HomeButton";
 import BasicPanel from "../../components/BasicPanel";
 import CollapsiblePanel from "../../components/CollapsiblePanel";
 import ColorBlock from "../../components/ColorBlock";
-import {TestSidebar} from "../../components/TestSidebar";
 
 import {
     OscillogramGraph,
@@ -21,7 +20,6 @@ export const componentMap = {
     BasicPanel,
     CollapsiblePanel,
     ColorBlock,
-    TestSidebar,
 
     OscillogramGraph,
     GainSlider,

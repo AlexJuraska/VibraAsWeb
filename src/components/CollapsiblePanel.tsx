@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, IconButton, Drawer, useTheme } from "@mui/material";
 import { Menu as MenuIcon, ChevronLeft } from "@mui/icons-material";
 import { ComponentMap } from "../layout-system/types/ComponentMap";
@@ -22,6 +22,10 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
     const [open, setOpen] = useState(!collapsed);
     const theme = useTheme();
 
+    useEffect(() => {
+        setOpen(!collapsed);
+    }, [collapsed]);
+
     const toggle = () => setOpen((prev) => !prev);
 
     const flowChildren = children.filter(
@@ -39,39 +43,33 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
 
     return (
         <>
-            <Box
-                sx={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    height: "100%",
-                    display: open ? "none" : "flex",
-                    alignItems: "center",
-                }}
-            >
+            {!open && (
                 <Box
                     sx={{
-                        height: "100%",
-                        aspectRatio: "1 / 1",
-                        p: 1.5,
-                        boxSizing: "border-box",
+                        width: "100%",
+                        maxWidth: 72,
+                        minWidth: 0,
+                        display: "flex",
+                        alignSelf: "center",
+                        justifySelf: "start",
+                        flexShrink: 0,
                     }}
                 >
                     <IconButton
+                        disableRipple
                         onClick={toggle}
                         sx={{
-                            width: "100%",
                             height: "100%",
                             minWidth: 0,
                             minHeight: 0,
+                            padding: 0,
+                            aspectRatio: "1 / 1",
                             borderRadius: "50%",
                             color: "white",
                             backgroundColor: "rgba(0,0,0,0.4)",
-
                             "& .MuiSvgIcon-root": {
-                                fontSize: "clamp(70%, 4vw, 90%)",
+                                fontSize: "clamp(1rem, 60%, 1.5rem)",
                             },
-
                             "&:hover": {
                                 backgroundColor: "rgba(0,0,0,0.6)",
                             },
@@ -80,8 +78,7 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                         <MenuIcon />
                     </IconButton>
                 </Box>
-            </Box>
-
+            )}
 
             <Drawer
                 open={open}
@@ -113,7 +110,9 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                             color: "white",
                             backgroundColor: "rgba(0,0,0,0.4)",
                             borderRadius: "50%",
-                            "&:hover": { backgroundColor: "rgba(0,0,0,0.6)" },
+                            "&:hover": {
+                                backgroundColor: "rgba(0,0,0,0.6)",
+                            },
                         }}
                     >
                         <ChevronLeft />

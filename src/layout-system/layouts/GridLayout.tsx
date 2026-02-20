@@ -25,6 +25,12 @@ export const GridLayout: React.FC<GridLayoutProps> = ({ config, components }) =>
         (isSmUp && grid.sm) ||
         grid.xs;
 
+    const breakpoint =
+        isXlUp ? "xl" :
+            isLgUp ? "lg" :
+                isMdUp ? "md" :
+                    isSmUp ? "sm" :
+                        "xs";
 
     if (!gridVariant) {
         console.warn("No valid grid variant found in config.");
@@ -65,6 +71,7 @@ export const GridLayout: React.FC<GridLayoutProps> = ({ config, components }) =>
 
     return (
         <motion.div
+            key={breakpoint}
             layout
             animate={{
                 gridTemplateColumns: computedColumns.join(" "),
