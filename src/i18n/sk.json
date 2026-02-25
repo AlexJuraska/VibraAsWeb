@@ -73,6 +73,12 @@
           "decodeError": "Nahrávku sa nepodarilo dekódovať.",
           "unsupported": "MediaRecorder nie je v tomto prehliadači podporovaný."
         },
+        "audioFileUploader": {
+          "button": "Nahrať WAV",
+          "loading": "Načítava sa…",
+          "onlyWav": "Prosím vyberte súbor .wav.",
+          "decodeError": "Audio súbor sa nepodarilo načítať."
+        },
         "graph": {
           "xAxis": "Čas (s)",
           "yAxis": "Amplitúda",

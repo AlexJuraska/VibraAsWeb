@@ -13,7 +13,7 @@ import {
     AudioOutputDeviceSelector,
     SavedFrequencyDropdown,
 } from "../../experiments/chladniPatterns/components";
-import { AudioInputDeviceSelector, AudioRecordButton, AudioRecordingDebug, AudioRecordingGraph } from "../../experiments/audioAnalysis/components";
+import { AudioFileUploader, AudioInputDeviceSelector, AudioRecordButton, AudioRecordingDebug, AudioRecordingGraph } from "../../experiments/audioAnalysis/components";
 
 export const componentMap = {
     HomeButton,
@@ -27,6 +27,7 @@ export const componentMap = {
     StartStopButton,
     AudioOutputDeviceSelector,
     SavedFrequencyDropdown,
+    AudioFileUploader,
     AudioInputDeviceSelector,
     AudioRecordButton,
     AudioRecordingDebug,
