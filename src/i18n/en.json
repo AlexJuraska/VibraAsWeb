@@ -73,6 +73,12 @@
           "decodeError": "Could not decode the recording.",
           "unsupported": "MediaRecorder is not supported in this browser."
         },
+        "audioFileUploader": {
+          "button": "Upload WAV",
+          "loading": "Loading…",
+          "onlyWav": "Please select a .wav file.",
+          "decodeError": "Could not read the audio file."
+        },
         "graph": {
           "xAxis": "Time (s)",
           "yAxis": "Amplitude",

@@ -8,6 +8,7 @@
         "children": [
           { "component": "AudioInputDeviceSelector", "props": {} },
           { "component": "AudioRecordButton", "props": {} },
+          { "component": "AudioFileUploader", "props": {} },
           { "component": "AudioRecordingDebug", "props": {} }
         ]
       }
@@ -22,6 +23,7 @@
         "children": [
           { "component": "AudioInputDeviceSelector", "props": {} },
           { "component": "AudioRecordButton", "props": {} },
+          { "component": "AudioFileUploader", "props": {} },
           { "component": "AudioRecordingDebug", "props": {} },
           { "component": "ColorBlock", "props": {"color":  "orange", "label":  "LeftPanel2"} }
         ]
