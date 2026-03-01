@@ -1,6 +1,7 @@
 {
-  "layout": "GridLayout",
+  "layout": "SlideLayout",
   "zones": {
+
     "CollapsiblePanel": {
       "component": "CollapsiblePanel",
       "props": {
@@ -12,10 +13,32 @@
         ]
       }
     },
+
     "mainContent": {
       "component": "AudioRecordingGraph",
       "props": {}
     },
+
+    "topGraph": {
+      "component": "AudioRecordingGraph",
+      "props": {},
+      "slideable": true,
+      "slideLabel": "Top Graph",
+      "slideDirection": "top",
+      "slideGroup": "topBottom",
+      "defaultOpen": true
+    },
+
+    "bottomGraph": {
+      "component": "AudioRecordingGraph",
+      "props": {},
+      "slideable": true,
+      "slideLabel": "Bottom Graph",
+      "slideDirection": "bottom",
+      "slideGroup": "topBottom",
+      "defaultOpen": false
+    },
+
     "leftPanel": {
       "component": "BasicPanel",
       "props": {
@@ -26,17 +49,11 @@
           { "component": "ColorBlock", "props": {"color":  "orange", "label":  "LeftPanel2"} }
         ]
       }
-    },
-    "bottomPanel": {
-      "component": "BasicPanel",
-      "props": {
-        "children": [
-          { "component": "ColorBlock", "props": {"color":  "yellow", "label":  "BottomPanel"} }
-        ]
-      }
     }
   },
+
   "grid": {
+
     "xs": {
       "areas": [
         ["CollapsiblePanel"],
@@ -45,13 +62,14 @@
       "columns": ["1fr"],
       "rows": ["60px", "1fr"]
     },
+
     "xl": {
       "areas": [
-        ["leftPanel", "mainContent"],
-        ["leftPanel","bottomPanel"]
+        ["leftPanel", "topGraph"],
+        ["leftPanel", "bottomGraph"]
       ],
       "columns": ["2fr", "8fr"],
-      "rows": ["1fr", "80px"]
+      "rows": ["1fr", "1fr"]
     }
   }
 }
