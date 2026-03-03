@@ -3,13 +3,15 @@ import Graph from "../../../components/Graph";
 import type { ChartDataProps, Dataset, Point } from "../../../components/Graph";
 import type { ChartOptions } from "chart.js";
 import { useAudioRecording } from "../state/audioRecordingBus";
+import { useAudioPlayback } from "../state/audioPlaybackBus";
 import { useTranslation } from "../../../i18n/i18n";
 
 const MAX_POINTS = 5000;
 
-const AudioAnalysisGraph: React.FC = () => {
+const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busId = "main", label }) => {
     const { t } = useTranslation();
-    const recording = useAudioRecording();
+    const recording = useAudioRecording(busId);
+    const playback = useAudioPlayback(busId);
     const [yDomain, setYDomain] = React.useState<{ min: number; max: number } | undefined>(undefined);
 
     const data = React.useMemo<ChartDataProps | undefined>(() => {
@@ -41,18 +43,36 @@ const AudioAnalysisGraph: React.FC = () => {
             max = 1;
         }
         const pad = Math.max((max - min) * 0.1, 0.05);
-        setYDomain({ min: min - pad, max: max + pad });
+        const paddedMin = min - pad;
+        const paddedMax = max + pad;
+        setYDomain({ min: paddedMin, max: paddedMax });
 
-        const ds: Dataset = {
-            label: "Recording",
-            data: pts,
-            borderColor: "#1976d2",
-            backgroundColor: "rgba(25, 118, 210, 0.2)",
-            pointRadius: 0,
-        };
+        const datasets: Dataset[] = [
+            {
+                label: label ?? t("experiments.audioAnalysis.components.graph.dataset", "Recording"),
+                data: pts,
+                borderColor: "#1976d2",
+                backgroundColor: "rgba(25, 118, 210, 0.2)",
+                pointRadius: 0,
+            },
+        ];
 
-        return { datasets: [ds] };
-    }, [recording]);
+        if (playback && playback.currentTime != null) {
+            datasets.push({
+                label: "Playhead",
+                data: [
+                    { x: playback.currentTime, y: paddedMin },
+                    { x: playback.currentTime, y: paddedMax },
+                ],
+                borderColor: "rgba(220,0,0,0.9)",
+                backgroundColor: "rgba(220,0,0,0.4)",
+                borderWidth: 2,
+                pointRadius: 0,
+            });
+        }
+
+        return { datasets };
+    }, [label, playback, recording, t]);
 
     const durationSec = React.useMemo(() => {
         if (!recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
@@ -78,11 +98,36 @@ const AudioAnalysisGraph: React.FC = () => {
         },
     }), [t, yDomain, durationSec]);
 
+    const cursorPlugin = React.useMemo(() => ({
+        id: "playback-cursor",
+        afterDraw(chart: any) {
+            if (!playback || playback.currentTime == null || Number.isNaN(playback.currentTime)) return;
+            const xScale = chart.scales.x;
+            const { chartArea } = chart;
+            if (!xScale || !chartArea) return;
+            const xMin = xScale.min ?? 0;
+            const xMax = xScale.max ?? durationSec ?? 0;
+            if (xMax <= xMin) return;
+            const xValue = Math.min(Math.max(playback.currentTime, xMin), xMax);
+            const xPixel = xScale.getPixelForValue(xValue);
+            if (!Number.isFinite(xPixel)) return;
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.strokeStyle = "rgba(220,0,0,0.9)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(xPixel, chartArea.top);
+            ctx.lineTo(xPixel, chartArea.bottom);
+            ctx.stroke();
+            ctx.restore();
+        },
+    }), [durationSec, playback]);
+
     if (!data) {
         return <div>{t("experiments.audioAnalysis.components.graph.empty", "Record audio to see the waveform.")}</div>;
     }
 
-    return <Graph data={data} options={options} style={{ width: "100%", height: "100%" }} />;
+    return <Graph data={data} options={options} plugins={[cursorPlugin]} style={{ width: "100%", height: "100%" }} />;
 };
 
 export default AudioAnalysisGraph;

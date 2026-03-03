@@ -82,7 +82,8 @@
         "graph": {
           "xAxis": "Čas (s)",
           "yAxis": "Amplituda",
-          "empty": "Nahrajte audio pro zobrazení průběhu."
+          "empty": "Nahrajte zvuk pro zobrazení průběhu.",
+          "dataset": "Záznam"
         }
       }
     }

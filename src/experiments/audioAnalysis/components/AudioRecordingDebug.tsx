@@ -1,9 +1,10 @@
 import React from "react";
 import { Box, Button, Divider, Stack, Typography } from "@mui/material";
 import { useAudioRecording } from "../state/audioRecordingBus";
+import { audioPlaybackBus } from "../state/audioPlaybackBus";
 
-const AudioRecordingDebug: React.FC = () => {
-    const recording = useAudioRecording();
+const AudioRecordingDebug: React.FC<{ busId?: string }> = ({ busId = "main" }) => {
+    const recording = useAudioRecording(busId);
     const [url, setUrl] = React.useState<string>("");
 
     React.useEffect(() => {
@@ -17,6 +18,19 @@ const AudioRecordingDebug: React.FC = () => {
             if (url) URL.revokeObjectURL(url);
         };
     }, [recording?.blob]);
+
+    React.useEffect(() => {
+        audioPlaybackBus.publish(recording ? { currentTime: 0, duration: recording.duration, playing: false } : undefined, busId);
+    }, [busId, recording]);
+
+    const onTimeUpdate: React.ReactEventHandler<HTMLAudioElement> = (e) => {
+        const el = e.currentTarget;
+        audioPlaybackBus.publish({ currentTime: el.currentTime, duration: el.duration, playing: !el.paused }, busId);
+    };
+
+    const onPlayPause = (playing: boolean, el?: HTMLAudioElement) => {
+        audioPlaybackBus.publish({ currentTime: el?.currentTime ?? 0, duration: el?.duration, playing }, busId);
+    };
 
     if (!recording) {
         return <Typography variant="body2">No recording yet.</Typography>;
@@ -33,7 +47,14 @@ const AudioRecordingDebug: React.FC = () => {
             <Divider />
             {url && (
                 <Stack direction="row" spacing={1} alignItems="center">
-                    <audio controls src={url} />
+                    <audio
+                        controls
+                        src={url}
+                        onTimeUpdate={onTimeUpdate}
+                        onPlay={(e) => onPlayPause(true, e.currentTarget)}
+                        onPause={(e) => onPlayPause(false, e.currentTarget)}
+                        onLoadedMetadata={(e) => onPlayPause(!e.currentTarget.paused, e.currentTarget)}
+                    />
                     <Button size="small" variant="outlined" href={url} download="recording.wav">
                         Download
                     </Button>

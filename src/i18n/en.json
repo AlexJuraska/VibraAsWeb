@@ -82,7 +82,8 @@
         "graph": {
           "xAxis": "Time (s)",
           "yAxis": "Amplitude",
-          "empty": "Record audio to see the waveform."
+          "empty": "Record audio to see the waveform.",
+          "dataset": "Recording"
         }
 
       }

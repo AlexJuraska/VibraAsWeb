@@ -5,33 +5,48 @@ export type AudioRecording = {
     blob?: Blob;
 };
 
+// Listener for recording updates.
 type Listener = (rec: AudioRecording | undefined) => void;
 
-let current: AudioRecording | undefined;
-const listeners = new Set<Listener>();
+// Track recordings by bus id so multiple graphs can have independent datasets.
+const recordings = new Map<string, AudioRecording | undefined>();
+const listenersByBus = new Map<string, Set<Listener>>();
+
+function getListeners(busId: string): Set<Listener> {
+    const existing = listenersByBus.get(busId);
+    if (existing) return existing;
+    const set = new Set<Listener>();
+    listenersByBus.set(busId, set);
+    return set;
+}
+
+function getRecording(busId: string): AudioRecording | undefined {
+    return recordings.get(busId);
+}
 
 export const audioRecordingBus = {
-    publish(rec: AudioRecording | undefined) {
-        current = rec;
-        listeners.forEach((l) => l(rec));
+    publish(rec: AudioRecording | undefined, busId = "main") {
+        recordings.set(busId, rec);
+        getListeners(busId).forEach((l) => l(rec));
     },
-    get() {
-        return current;
+    get(busId = "main") {
+        return getRecording(busId);
     },
-    subscribe(listener: Listener) {
+    subscribe(listener: Listener, busId = "main") {
+        const listeners = getListeners(busId);
         listeners.add(listener);
-        listener(current);
+        listener(getRecording(busId));
         return () => {
             listeners.delete(listener);
         };
     },
 };
 
-export function useAudioRecording(): AudioRecording | undefined {
-    const [value, setValue] = useState<AudioRecording | undefined>(() => current);
+export function useAudioRecording(busId = "main"): AudioRecording | undefined {
+    const [value, setValue] = useState<AudioRecording | undefined>(() => getRecording(busId));
     useEffect(() => {
-        return audioRecordingBus.subscribe(setValue);
-    }, []);
+        return audioRecordingBus.subscribe(setValue, busId);
+    }, [busId]);
     return value;
 }
 
