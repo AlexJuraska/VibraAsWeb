@@ -4,7 +4,7 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { useTranslation } from "../../../i18n/i18n";
 import { audioRecordingBus } from "../state/audioRecordingBus";
 
-const AudioFileUploader: React.FC = () => {
+const AudioFileUploader: React.FC<{ busId?: string }> = ({ busId = "main" }) => {
     const { t } = useTranslation();
     const inputRef = React.useRef<HTMLInputElement | null>(null);
     const [error, setError] = React.useState<string | null>(null);
@@ -33,7 +33,7 @@ const AudioFileUploader: React.FC = () => {
                 sampleRate: decoded.sampleRate,
                 duration: decoded.duration,
                 blob: file,
-            });
+            }, busId);
         } catch (err) {
             console.error(err);
             setError(t("experiments.audioAnalysis.components.audioFileUploader.decodeError", "Could not read the audio file."));
@@ -73,4 +73,3 @@ const AudioFileUploader: React.FC = () => {
 };
 
 export default AudioFileUploader;
-

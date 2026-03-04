@@ -4,6 +4,7 @@ import HomeButton from "../../components/HomeButton";
 import BasicPanel from "../../components/BasicPanel";
 import CollapsiblePanel from "../../components/CollapsiblePanel";
 import ColorBlock from "../../components/ColorBlock";
+import DividerLine from "../../components/DividerLine";
 
 import {
     OscillogramGraph,
@@ -13,13 +14,14 @@ import {
     AudioOutputDeviceSelector,
     SavedFrequencyDropdown,
 } from "../../experiments/chladniPatterns/components";
-import { AudioFileUploader, AudioInputDeviceSelector, AudioRecordButton, AudioRecordingDebug, AudioRecordingGraph } from "../../experiments/audioAnalysis/components";
+import { AudioFileUploader, AudioInputDeviceSelector, AudioRecordButton, AudioRecordingDebug, AudioRecordingGraph, AudioControlsPanel } from "../../experiments/audioAnalysis/components";
 
 export const componentMap = {
     HomeButton,
     BasicPanel,
     CollapsiblePanel,
     ColorBlock,
+    DividerLine,
 
     OscillogramGraph,
     GainSlider,
@@ -32,6 +34,7 @@ export const componentMap = {
     AudioRecordButton,
     AudioRecordingDebug,
     AudioRecordingGraph,
+    AudioControlsPanel,
 };
 
 export type ComponentMap = Record<string, React.ComponentType<any>>;

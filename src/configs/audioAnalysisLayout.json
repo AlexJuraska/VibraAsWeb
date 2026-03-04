@@ -8,21 +8,21 @@
         "collapsed": true,
         "children": [
           { "component": "AudioInputDeviceSelector", "props": {} },
-          { "component": "AudioRecordButton", "props": {} },
-          { "component": "AudioFileUploader", "props": {} },
-          { "component": "AudioRecordingDebug", "props": {} }
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioRecordButton", "props": { "busId": "main" } },
+          { "component": "AudioFileUploader", "props": { "busId": "main" } },
+          { "component": "AudioRecordingDebug", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioRecordButton", "props": { "busId": "second" } },
+          { "component": "AudioFileUploader", "props": { "busId": "second" } },
+          { "component": "AudioRecordingDebug", "props": { "busId": "second" } }
         ]
       }
     },
 
-    "mainContent": {
-      "component": "AudioRecordingGraph",
-      "props": {}
-    },
-
     "topGraph": {
       "component": "AudioRecordingGraph",
-      "props": {},
+      "props": { "busId": "main", "label": "Graph 1" },
       "slideable": true,
       "slideLabel": "Top Graph",
       "slideDirection": "top",
@@ -32,25 +32,17 @@
 
     "bottomGraph": {
       "component": "AudioRecordingGraph",
-      "props": {},
+      "props": { "busId": "second", "label": "Graph 2" },
       "slideable": true,
       "slideLabel": "Bottom Graph",
       "slideDirection": "bottom",
       "slideGroup": "topBottom",
-      "defaultOpen": false
+      "defaultOpen": true
     },
 
     "leftPanel": {
-      "component": "BasicPanel",
-      "props": {
-        "children": [
-          { "component": "AudioInputDeviceSelector", "props": {} },
-          { "component": "AudioRecordButton", "props": {} },
-          { "component": "AudioFileUploader", "props": {} },
-          { "component": "AudioRecordingDebug", "props": {} },
-          { "component": "ColorBlock", "props": {"color":  "orange", "label":  "LeftPanel2"} }
-        ]
-      }
+      "component": "AudioControlsPanel",
+      "props": {}
     }
   },
 
@@ -59,10 +51,11 @@
     "xs": {
       "areas": [
         ["CollapsiblePanel"],
-        ["mainContent"]
+        ["topGraph"],
+        ["bottomGraph"]
       ],
       "columns": ["1fr"],
-      "rows": ["60px", "1fr"]
+      "rows": ["60px", "1fr", "1fr"]
     },
 
     "xl": {

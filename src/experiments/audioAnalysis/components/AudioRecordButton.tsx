@@ -42,9 +42,10 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
 
 type Props = {
     onRecordingComplete?: () => void;
+    busId?: string;
 };
 
-const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete }) => {
+const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main" }) => {
     const { t } = useTranslation();
     const deviceId = useAudioInputDevice();
 
@@ -112,9 +113,9 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete }) => {
                     copy.set(channel);
 
                     const wavBlob = encodeWav(copy, decoded.sampleRate);
-                    audioRecordingBus.publish({ samples: copy, sampleRate: decoded.sampleRate, duration: decoded.duration, blob: wavBlob });
-                     onRecordingComplete?.();
-                     setStatus("idle");
+                    audioRecordingBus.publish({ samples: copy, sampleRate: decoded.sampleRate, duration: decoded.duration, blob: wavBlob }, busId);
+                    onRecordingComplete?.();
+                    setStatus("idle");
                 } catch (err) {
                     console.error(err);
                     setError(t("experiments.audioAnalysis.components.audioRecorder.decodeError", "Could not decode the recording."));
