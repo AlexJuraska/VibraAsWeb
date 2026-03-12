@@ -5,7 +5,8 @@
     "experiment_chladni": "Chladni's Patterns",
     "experiment_audio_analysis": "Audio Analysis",
     "experiment_laser": "Laser Vibrometer",
-    "experiment_graph": "Graph Test"
+    "experiment_graph": "Graph Test",
+    "experiment_fourier_demo": "Fourier Demo"
   },
   "notFound": {
     "notFound": "Page not found"
