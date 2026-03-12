@@ -5,7 +5,8 @@
     "experiment_chladni": "Chladniho vzorce",
     "experiment_audio_analysis": "Audio analýza",
     "experiment_laser": "Laser Vibrometer",
-    "experiment_graph": "Graph Test"
+    "experiment_graph": "Graph Test",
+    "experiment_fourier_demo": "Fourier Demo"
   },
   "notFound": {
     "notFound": "Stránka nenájdená"
