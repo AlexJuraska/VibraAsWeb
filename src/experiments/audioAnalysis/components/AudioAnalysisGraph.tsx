@@ -1,20 +1,38 @@
 import React from "react";
+import { Button, ButtonGroup, Stack } from "@mui/material";
 import Graph from "../../../components/Graph";
 import type { ChartDataProps, Dataset, Point } from "../../../components/Graph";
 import type { ChartOptions } from "chart.js";
 import { useAudioRecording } from "../state/audioRecordingBus";
 import { useAudioPlayback } from "../state/audioPlaybackBus";
 import { useTranslation } from "../../../i18n/i18n";
+import { useAudioFft, useAudioFftPeak } from "../state/audioFftBus";
 
 const MAX_POINTS = 5000;
+type ViewMode = "time" | "freq";
 
 const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busId = "main", label }) => {
     const { t } = useTranslation();
     const recording = useAudioRecording(busId);
     const playback = useAudioPlayback(busId);
-    const [yDomain, setYDomain] = React.useState<{ min: number; max: number } | undefined>(undefined);
+    const fftFrame = useAudioFft(busId);
+    const fftPeak = useAudioFftPeak(busId);
+    const [timeYDomain, setTimeYDomain] = React.useState<{ min: number; max: number } | undefined>(undefined);
+    const [freqYDomain, setFreqYDomain] = React.useState<{ min: number; max: number } | undefined>(undefined);
+    const [graphView, setGraphView] = React.useState<ViewMode>("time");
 
-    const data = React.useMemo<ChartDataProps | undefined>(() => {
+    const recordingPeak = React.useMemo(() => {
+        if (!recording || recording.samples.length === 0) return undefined;
+        let max = 0;
+        const s = recording.samples;
+        for (let i = 0; i < s.length; i++) {
+            const v = Math.abs(s[i]);
+            if (v > max) max = v;
+        }
+        return max || undefined;
+    }, [recording]);
+
+    const timeData = React.useMemo<ChartDataProps | undefined>(() => {
         if (!recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
 
         const step = Math.max(1, Math.ceil(recording.samples.length / MAX_POINTS));
@@ -45,7 +63,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
         const pad = Math.max((max - min) * 0.1, 0.05);
         const paddedMin = min - pad;
         const paddedMax = max + pad;
-        setYDomain({ min: paddedMin, max: paddedMax });
+        setTimeYDomain({ min: paddedMin, max: paddedMax });
 
         const datasets: Dataset[] = [
             {
@@ -74,12 +92,54 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
         return { datasets };
     }, [label, playback, recording, t]);
 
+    const freqData = React.useMemo<ChartDataProps | undefined>(() => {
+        if (!fftFrame || fftFrame.magnitudes.length === 0) return undefined;
+        const step = Math.max(1, Math.ceil(fftFrame.magnitudes.length / MAX_POINTS));
+        const pts: Point[] = [];
+        const colors: string[] = [];
+        const nyquist = fftFrame.sampleRate / 2;
+        let maxMag = 0;
+        for (let i = 0; i < fftFrame.magnitudes.length; i += step) {
+            const freq = fftFrame.frequencies[i];
+            const y = fftFrame.magnitudes[i];
+            pts.push({ x: freq, y });
+            if (y > maxMag) maxMag = y;
+            const hue = Math.max(0, Math.min(120, (freq / nyquist) * 120));
+            colors.push(`hsl(${hue}, 90%, 55%)`);
+        }
+        // Ensure the Nyquist bin is included for full-width rendering.
+        const lastIdx = fftFrame.magnitudes.length - 1;
+        if (pts.length === 0 || pts[pts.length - 1].x < fftFrame.frequencies[lastIdx]) {
+            pts.push({ x: fftFrame.frequencies[lastIdx], y: fftFrame.magnitudes[lastIdx] });
+            if (fftFrame.magnitudes[lastIdx] > maxMag) maxMag = fftFrame.magnitudes[lastIdx];
+            const hue = Math.max(0, Math.min(120, (fftFrame.frequencies[lastIdx] / nyquist) * 120));
+            colors.push(`hsl(${hue}, 90%, 55%)`);
+        }
+        const peak = fftPeak && fftPeak > 0 ? fftPeak : maxMag > 0 ? maxMag : 1;
+        const paddedPeak = peak * 1.1;
+        setFreqYDomain({ min: 0, max: paddedPeak });
+
+        return {
+            datasets: [
+                {
+                    label: label ?? t("experiments.audioAnalysis.components.graph.fftDataset", "FFT"),
+                    data: pts,
+                    type: "bar",
+                    backgroundColor: colors,
+                    borderWidth: 0,
+                    pointRadius: 0,
+                    showLine: false,
+                },
+            ],
+        };
+    }, [fftFrame, label, recordingPeak, t]);
+
     const durationSec = React.useMemo(() => {
         if (!recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
         return recording.samples.length / recording.sampleRate;
     }, [recording]);
 
-    const options = React.useMemo<ChartOptions<"line">>(() => ({
+    const timeOptions = React.useMemo<ChartOptions<"bar" | "line">>(() => ({
         animation: false,
         plugins: { legend: { display: false } },
         scales: {
@@ -92,42 +152,76 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
             y: {
                 type: "linear",
                 title: { display: true, text: t("experiments.audioAnalysis.components.graph.yAxis", "Amplitude") },
-                min: yDomain?.min ?? -1,
-                max: yDomain?.max ?? 1,
+                min: timeYDomain?.min ?? -1,
+                max: timeYDomain?.max ?? 1,
             },
         },
-    }), [t, yDomain, durationSec]);
+    }), [t, timeYDomain, durationSec]);
 
-    const cursorPlugin = React.useMemo(() => ({
-        id: "playback-cursor",
-        afterDraw(chart: any) {
-            if (!playback || playback.currentTime == null || Number.isNaN(playback.currentTime)) return;
-            const xScale = chart.scales.x;
-            const { chartArea } = chart;
-            if (!xScale || !chartArea) return;
-            const xMin = xScale.min ?? 0;
-            const xMax = xScale.max ?? durationSec ?? 0;
-            if (xMax <= xMin) return;
-            const xValue = Math.min(Math.max(playback.currentTime, xMin), xMax);
-            const xPixel = xScale.getPixelForValue(xValue);
-            if (!Number.isFinite(xPixel)) return;
-            const ctx = chart.ctx;
-            ctx.save();
-            ctx.strokeStyle = "rgba(220,0,0,0.9)";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(xPixel, chartArea.top);
-            ctx.lineTo(xPixel, chartArea.bottom);
-            ctx.stroke();
-            ctx.restore();
+    const freqOptions = React.useMemo<ChartOptions<"bar" | "line">>(() => ({
+        animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                type: "linear",
+                title: { display: true, text: t("experiments.audioAnalysis.components.graph.freqAxis", "Frequency (Hz)") },
+                min: 0,
+                max: fftFrame ? fftFrame.sampleRate / 2 : undefined,
+                offset: false,
+            },
+            y: {
+                type: "linear",
+                title: { display: true, text: t("experiments.audioAnalysis.components.graph.magAxis", "Amplitude") },
+                min: 0,
+                max: freqYDomain?.max ?? 1,
+            },
         },
-    }), [durationSec, playback]);
+    }), [fftFrame, freqYDomain?.max, t]);
 
-    if (!data) {
-        return <div>{t("experiments.audioAnalysis.components.graph.empty", "Record audio to see the waveform.")}</div>;
+    const activeData = graphView === "time" ? timeData : freqData;
+    const activeOptions = graphView === "time" ? timeOptions : freqOptions;
+    const activeChartType = graphView === "freq" ? "bar" : "line";
+
+    if (!activeData) {
+        return (
+            <Stack spacing={1} sx={{ height: "100%" }}>
+                <ButtonGroup size="small" variant="outlined">
+                    <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setGraphView("time")}>
+                        {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
+                    </Button>
+                    <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setGraphView("freq")}>
+                        {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
+                    </Button>
+                </ButtonGroup>
+                <div>
+                    {graphView === "time"
+                        ? t("experiments.audioAnalysis.components.graph.empty", "Record audio to see the waveform.")
+                        : t("experiments.audioAnalysis.components.graph.fftEmpty", "Record audio to see the spectrum.")}
+                </div>
+            </Stack>
+        );
     }
 
-    return <Graph data={data} options={options} plugins={[cursorPlugin]} style={{ width: "100%", height: "100%" }} />;
+    return (
+        <Stack spacing={1} sx={{ height: "100%" }}>
+            <ButtonGroup size="small" variant="outlined">
+                <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setGraphView("time")}>
+                    {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
+                </Button>
+                <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setGraphView("freq")}>
+                    {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
+                </Button>
+            </ButtonGroup>
+            <Graph
+                key={`${busId}-${graphView}`}
+                data={activeData}
+                options={activeOptions}
+                plugins={undefined}
+                style={{ width: "100%", height: "100%" }}
+                chartType={activeChartType}
+            />
+        </Stack>
+    );
 };
 
 export default AudioAnalysisGraph;
