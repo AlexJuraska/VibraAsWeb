@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, ButtonGroup, Stack } from "@mui/material";
+import { Stack, ButtonGroup, Button } from "@mui/material";
 import Graph from "../../../components/Graph";
 import type { ChartDataProps, Dataset, Point } from "../../../components/Graph";
 import type { ChartOptions } from "chart.js";
@@ -11,7 +11,7 @@ import { useAudioFft, useAudioFftPeak } from "../state/audioFftBus";
 const MAX_POINTS = 5000;
 type ViewMode = "time" | "freq";
 
-const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busId = "main", label }) => {
+const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: ViewMode; initialView?: ViewMode; enableToggle?: boolean }> = ({ busId = "main", label, mode, initialView = "time", enableToggle = false }) => {
     const { t } = useTranslation();
     const recording = useAudioRecording(busId);
     const playback = useAudioPlayback(busId);
@@ -19,7 +19,55 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
     const fftPeak = useAudioFftPeak(busId);
     const [timeYDomain, setTimeYDomain] = React.useState<{ min: number; max: number } | undefined>(undefined);
     const [freqYDomain, setFreqYDomain] = React.useState<{ min: number; max: number } | undefined>(undefined);
-    const [graphView, setGraphView] = React.useState<ViewMode>("time");
+    const [viewState, setViewState] = React.useState<ViewMode>(initialView);
+    const timeExtentRef = React.useRef<{ min: number; max: number } | null>(null);
+    const freqExtentRef = React.useRef<{ min: number; max: number } | null>(null);
+
+    React.useEffect(() => {
+        if (enableToggle) {
+            setViewState(initialView);
+        }
+    }, [enableToggle, initialView]);
+
+    React.useEffect(() => {
+        if (!recording || recording.samples.length === 0) {
+            timeExtentRef.current = null;
+            setTimeYDomain(undefined);
+        }
+    }, [recording]);
+
+    React.useEffect(() => {
+        if (!fftFrame || fftFrame.magnitudes.length === 0) {
+            freqExtentRef.current = null;
+            setFreqYDomain(undefined);
+        }
+    }, [fftFrame]);
+
+    const playheadTimeRef = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+        playheadTimeRef.current = playback?.currentTime ?? null;
+    }, [playback?.currentTime]);
+
+    const playheadPlugin = React.useMemo(() => ({
+        id: `playhead-${busId}`,
+        afterDraw: (chart: any) => {
+            const currentTime = playheadTimeRef.current;
+            if (currentTime == null) return;
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea || !scales?.x) return;
+            const x = scales.x.getPixelForValue(currentTime);
+            if (!Number.isFinite(x)) return;
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x, chartArea.top);
+            ctx.lineTo(x, chartArea.bottom);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "rgba(220,0,0,0.9)";
+            ctx.stroke();
+            ctx.restore();
+        },
+    }), [busId]);
 
     const recordingPeak = React.useMemo(() => {
         if (!recording || recording.samples.length === 0) return undefined;
@@ -63,33 +111,25 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
         const pad = Math.max((max - min) * 0.1, 0.05);
         const paddedMin = min - pad;
         const paddedMax = max + pad;
-        setTimeYDomain({ min: paddedMin, max: paddedMax });
+        const prev = timeExtentRef.current;
+        const next = {
+            min: prev ? Math.min(prev.min, paddedMin) : paddedMin,
+            max: prev ? Math.max(prev.max, paddedMax) : paddedMax,
+        };
+        timeExtentRef.current = next;
+        setTimeYDomain(next);
 
-        const datasets: Dataset[] = [
-            {
-                label: label ?? t("experiments.audioAnalysis.components.graph.dataset", "Recording"),
-                data: pts,
-                borderColor: "#1976d2",
-                backgroundColor: "rgba(25, 118, 210, 0.2)",
-                pointRadius: 0,
-            },
-        ];
-
-        if (playback && playback.currentTime != null) {
-            datasets.push({
-                label: "Playhead",
-                data: [
-                    { x: playback.currentTime, y: paddedMin },
-                    { x: playback.currentTime, y: paddedMax },
-                ],
-                borderColor: "rgba(220,0,0,0.9)",
-                backgroundColor: "rgba(220,0,0,0.4)",
-                borderWidth: 2,
-                pointRadius: 0,
-            });
-        }
-
-        return { datasets };
+        return {
+            datasets: [
+                {
+                    label: label ?? t("experiments.audioAnalysis.components.graph.dataset", "Recording"),
+                    data: pts,
+                    borderColor: "#1976d2",
+                    backgroundColor: "rgba(25, 118, 210, 0.2)",
+                    pointRadius: 0,
+                },
+            ],
+        };
     }, [label, playback, recording, t]);
 
     const freqData = React.useMemo<ChartDataProps | undefined>(() => {
@@ -117,7 +157,11 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
         }
         const peak = fftPeak && fftPeak > 0 ? fftPeak : maxMag > 0 ? maxMag : 1;
         const paddedPeak = peak * 1.1;
-        setFreqYDomain({ min: 0, max: paddedPeak });
+        const prev = freqExtentRef.current;
+        const nextMax = prev ? Math.max(prev.max, paddedPeak) : paddedPeak;
+        const next = { min: 0, max: nextMax };
+        freqExtentRef.current = next;
+        setFreqYDomain(next);
 
         return {
             datasets: [
@@ -178,21 +222,29 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
         },
     }), [fftFrame, freqYDomain?.max, t]);
 
+    const graphView: ViewMode = enableToggle ? viewState : mode ?? "time";
     const activeData = graphView === "time" ? timeData : freqData;
     const activeOptions = graphView === "time" ? timeOptions : freqOptions;
     const activeChartType = graphView === "freq" ? "bar" : "line";
+    const graphPlugins = React.useMemo(() => {
+        const list: any[] = [];
+        if (graphView === "time" && playheadPlugin) list.push(playheadPlugin);
+        return list.length ? list : undefined;
+    }, [graphView, playheadPlugin]);
 
     if (!activeData) {
         return (
             <Stack spacing={1} sx={{ height: "100%" }}>
-                <ButtonGroup size="small" variant="outlined">
-                    <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setGraphView("time")}>
-                        {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
-                    </Button>
-                    <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setGraphView("freq")}>
-                        {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
-                    </Button>
-                </ButtonGroup>
+                {enableToggle && (
+                    <ButtonGroup size="small" variant="outlined">
+                        <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setViewState("time")}>
+                            {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
+                        </Button>
+                        <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setViewState("freq")}>
+                            {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
+                        </Button>
+                    </ButtonGroup>
+                )}
                 <div>
                     {graphView === "time"
                         ? t("experiments.audioAnalysis.components.graph.empty", "Record audio to see the waveform.")
@@ -204,19 +256,21 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string }> = ({ busI
 
     return (
         <Stack spacing={1} sx={{ height: "100%" }}>
-            <ButtonGroup size="small" variant="outlined">
-                <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setGraphView("time")}>
-                    {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
-                </Button>
-                <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setGraphView("freq")}>
-                    {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
-                </Button>
-            </ButtonGroup>
+            {enableToggle && (
+                <ButtonGroup size="small" variant="outlined">
+                    <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setViewState("time")}>
+                        {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
+                    </Button>
+                    <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setViewState("freq")}>
+                        {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
+                    </Button>
+                </ButtonGroup>
+            )}
             <Graph
                 key={`${busId}-${graphView}`}
                 data={activeData}
                 options={activeOptions}
-                plugins={undefined}
+                plugins={graphPlugins}
                 style={{ width: "100%", height: "100%" }}
                 chartType={activeChartType}
             />
