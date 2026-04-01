@@ -1,11 +1,12 @@
 import React from "react";
-import { Line } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
@@ -15,20 +16,20 @@ import Box from "@mui/material/Box";
 import { useTheme, alpha } from "@mui/material/styles";
 import type { Theme } from "@mui/material/styles";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
 
 export type Point = { x: number; y: number };
 
 export type Dataset = {
     label: string;
     data: Point[];
-    type?: "line" | "scatter";
+    type?: "line" | "scatter" | "bar";
     stepped?: boolean;
-    pointBackgroundColor?: string;
+    pointBackgroundColor?: string | string[];
     pointRadius?: number;
     showLine?: boolean;
-    backgroundColor?: string;
-    borderColor?: string;
+    backgroundColor?: string | string[];
+    borderColor?: string | string[];
     borderWidth?: number;
 };
 
@@ -38,13 +39,14 @@ export type ChartDataProps = {
 
 type Props = {
     data?: ChartDataProps;
-    options?: ChartOptions<"line">;
+    options?: ChartOptions<"line" | "bar">;
     plugins?: any[];
     className?: string;
     style?: React.CSSProperties;
+    chartType?: "line" | "bar";
 };
 
-const buildDefaultOptions = (theme: Theme): ChartOptions<"line"> => ({
+const buildDefaultOptions = (theme: Theme): ChartOptions<"line" | "bar"> => ({
     responsive: true,
     maintainAspectRatio: false,
     scales: {
@@ -74,8 +76,8 @@ const buildDefaultOptions = (theme: Theme): ChartOptions<"line"> => ({
             font: { family: theme.typography.fontFamily as string }
         },
         tooltip: {
-            titleColor: theme.palette.text.primary,
-            bodyColor: theme.palette.text.secondary
+            titleColor: theme.palette.common.white,
+            bodyColor: theme.palette.common.white
         }
     }
 });
@@ -85,7 +87,7 @@ const isValidChartData = (d: any): d is ChartDataProps => {
     return d.datasets.every((ds: any) => Array.isArray(ds?.data));
 };
 
-const Graph: React.FC<Props> = ({ data, options, plugins, className, style }) => {
+const Graph: React.FC<Props> = ({ data, options, plugins, className, style, chartType = "line" }) => {
     const theme = useTheme<Theme>();
 
     const emptyData = React.useMemo<ChartDataProps>(() => ({
@@ -129,12 +131,14 @@ const Graph: React.FC<Props> = ({ data, options, plugins, className, style }) =>
                 ...(base.plugins || {}),
                 ...((options && options.plugins) || {})
             }
-        } as ChartOptions<"line">;
+        } as ChartOptions<"line" | "bar">;
     }, [options, theme]);
+
+    const ChartComponent = chartType === "bar" ? Bar : Line;
 
     return (
         <Box className={className} style={{ height: 360, ...style }}>
-            <Line data={themedData as any} options={mergedOptions as any} plugins={plugins as any} />
+            <ChartComponent data={themedData as any} options={mergedOptions as any} plugins={plugins as any} />
         </Box>
     );
 };

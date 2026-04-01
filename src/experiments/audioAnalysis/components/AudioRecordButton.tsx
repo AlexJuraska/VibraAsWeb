@@ -7,7 +7,7 @@ import { useAudioInputDevice } from "../state/audioInputDeviceBus";
 import { audioRecordingBus } from "../state/audioRecordingBus";
 
 function encodeWav(samples: Float32Array, sampleRate: number): Blob {
-    const dataSize = samples.length * 2; // 16-bit PCM
+    const dataSize = samples.length * 2;
     const buffer = new ArrayBuffer(44 + dataSize);
     const view = new DataView(buffer);
 
@@ -19,13 +19,13 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
     view.setUint32(4, 36 + dataSize, true);
     writeString(8, "WAVE");
     writeString(12, "fmt ");
-    view.setUint32(16, 16, true); // PCM chunk size
-    view.setUint16(20, 1, true); // format PCM
-    view.setUint16(22, 1, true); // channels
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
     view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true); // byte rate
-    view.setUint16(32, 2, true); // block align
-    view.setUint16(34, 16, true); // bits per sample
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
     writeString(36, "data");
     view.setUint32(40, dataSize, true);
 
@@ -52,16 +52,44 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
     const [status, setStatus] = React.useState<Status>("idle");
     const [error, setError] = React.useState<string | null>(null);
 
-    const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+    const audioCtxRef = React.useRef<AudioContext | null>(null);
+    const sourceRef = React.useRef<MediaStreamAudioSourceNode | null>(null);
+    const processorRef = React.useRef<ScriptProcessorNode | null>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
-    const chunksRef = React.useRef<Blob[]>([]);
+    const sinkRef = React.useRef<GainNode | null>(null);
 
-    const resetStreams = () => {
-        mediaRecorderRef.current = null;
+    const accumBufferRef = React.useRef<Float32Array>(new Float32Array(0));
+    const totalSamplesRef = React.useRef<number>(0);
+    const publishIntervalMs = 50;
+    const lastPublishRef = React.useRef<number>(0);
+
+    const cleanup = () => {
+        processorRef.current?.disconnect();
+        sinkRef.current?.disconnect();
+        sourceRef.current?.disconnect();
+        processorRef.current = null;
+        sourceRef.current = null;
+        sinkRef.current = null;
+        if (audioCtxRef.current) {
+            audioCtxRef.current.close().catch(() => undefined);
+            audioCtxRef.current = null;
+        }
         if (streamRef.current) {
             streamRef.current.getTracks().forEach((t) => t.stop());
         }
         streamRef.current = null;
+        accumBufferRef.current = new Float32Array(0);
+        totalSamplesRef.current = 0;
+        lastPublishRef.current = 0;
+    };
+
+    const publishLive = (sampleRate: number) => {
+        if (totalSamplesRef.current === 0) return;
+        const samplesView = accumBufferRef.current.subarray(0, totalSamplesRef.current);
+        const samples = new Float32Array(samplesView.length);
+        samples.set(samplesView);
+        const duration = samples.length / sampleRate;
+        audioRecordingBus.publish({ samples, sampleRate, duration }, busId);
     };
 
     const startRecording = async () => {
@@ -69,15 +97,13 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
             setError(t("experiments.audioAnalysis.components.audioRecorder.permissionError", "Microphone access is not available."));
             return;
         }
-        if (typeof MediaRecorder === "undefined") {
-            setError(t("experiments.audioAnalysis.components.audioRecorder.unsupported", "MediaRecorder is not supported in this browser."));
-            return;
-        }
 
         try {
             setError(null);
             setStatus("recording");
-            chunksRef.current = [];
+            accumBufferRef.current = new Float32Array(0);
+            totalSamplesRef.current = 0;
+            lastPublishRef.current = performance.now();
 
             const constraints: MediaStreamConstraints = {
                 audio: deviceId && deviceId !== "default" ? { deviceId: { exact: deviceId } } : true,
@@ -85,47 +111,40 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             streamRef.current = stream;
 
-            const recorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = recorder;
+            const audioCtx = new AudioContext();
+            audioCtxRef.current = audioCtx;
+            const source = audioCtx.createMediaStreamSource(stream);
+            sourceRef.current = source;
+            const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+            processorRef.current = processor;
+            const sink = audioCtx.createGain();
+            sink.gain.value = 0;
+            sinkRef.current = sink;
 
-            recorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0) {
-                    chunksRef.current.push(e.data);
+            processor.onaudioprocess = (event) => {
+                const input = event.inputBuffer.getChannelData(0);
+                const needed = totalSamplesRef.current + input.length;
+                let buf = accumBufferRef.current;
+                if (needed > buf.length) {
+                    const nextSize = Math.max(needed, buf.length * 2 || input.length * 2);
+                    const expanded = new Float32Array(nextSize);
+                    expanded.set(buf.subarray(0, totalSamplesRef.current));
+                    buf = expanded;
+                    accumBufferRef.current = buf;
+                }
+                buf.set(input, totalSamplesRef.current);
+                totalSamplesRef.current = needed;
+
+                const now = performance.now();
+                if (now - lastPublishRef.current >= publishIntervalMs) {
+                    lastPublishRef.current = now;
+                    publishLive(audioCtx.sampleRate);
                 }
             };
 
-            recorder.onerror = (e) => {
-                console.error("MediaRecorder error", e);
-                setError(t("experiments.audioAnalysis.components.audioRecorder.recordingError", "Recording failed."));
-                setStatus("idle");
-                resetStreams();
-            };
-
-            recorder.onstop = async () => {
-                try {
-                    setStatus("processing");
-                    const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-                    const arrayBuffer = await blob.arrayBuffer();
-                    const audioCtx = new AudioContext();
-                    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-                    const channel = decoded.getChannelData(0);
-                    const copy = new Float32Array(channel.length);
-                    copy.set(channel);
-
-                    const wavBlob = encodeWav(copy, decoded.sampleRate);
-                    audioRecordingBus.publish({ samples: copy, sampleRate: decoded.sampleRate, duration: decoded.duration, blob: wavBlob }, busId);
-                    onRecordingComplete?.();
-                    setStatus("idle");
-                } catch (err) {
-                    console.error(err);
-                    setError(t("experiments.audioAnalysis.components.audioRecorder.decodeError", "Could not decode the recording."));
-                    setStatus("idle");
-                } finally {
-                    resetStreams();
-                }
-            };
-
-            recorder.start();
+            source.connect(processor);
+            processor.connect(sink);
+            sink.connect(audioCtx.destination);
         } catch (err: any) {
             console.error(err);
             if (err?.name === "NotAllowedError") {
@@ -136,15 +155,34 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
                 setError(t("experiments.audioAnalysis.components.audioRecorder.startError", "Could not start recording."));
             }
             setStatus("idle");
-            resetStreams();
+            cleanup();
         }
     };
 
     const stopRecording = () => {
         if (status !== "recording") return;
         setStatus("processing");
-        mediaRecorderRef.current?.stop();
-        resetStreams();
+
+        processorRef.current?.disconnect();
+        sourceRef.current?.disconnect();
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+
+        const audioCtx = audioCtxRef.current;
+        const sampleRate = audioCtx?.sampleRate;
+        const totalSamples = totalSamplesRef.current;
+
+        if (sampleRate && totalSamples > 0) {
+            const samplesView = accumBufferRef.current.subarray(0, totalSamples);
+            const samples = new Float32Array(samplesView.length);
+            samples.set(samplesView);
+            const duration = samples.length / sampleRate;
+            const wavBlob = encodeWav(samples, sampleRate);
+            audioRecordingBus.publish({ samples, sampleRate, duration, blob: wavBlob }, busId);
+            onRecordingComplete?.();
+        }
+
+        cleanup();
+        setStatus("idle");
     };
 
     const isBusy = status === "processing";
