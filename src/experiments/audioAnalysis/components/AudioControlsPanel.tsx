@@ -3,7 +3,6 @@ import { Box, Stack, Button } from "@mui/material";
 import { ComponentMap } from "../../../layout-system/types/ComponentMap";
 import { useLayoutMode } from "../layoutModeContext";
 
-// Single control column by default; optional second set when enabled.
 const AudioControlsPanel: React.FC<{ components: ComponentMap; showSecondControls?: boolean }> = ({ components, showSecondControls = false }) => {
     const InputSelector = components.AudioInputDeviceSelector;
     const RecordBtn = components.AudioRecordButton;

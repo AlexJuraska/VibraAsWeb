@@ -184,7 +184,7 @@ const theme = createTheme({
         MuiSelect: {
             styleOverrides: {
                 select: ({ theme }) => ({
-                    paddingRight: theme.spacing(4), // space from dropdown icon
+                    paddingRight: theme.spacing(4),
 
                     [theme.breakpoints.up("lg")]: {
                         paddingRight: theme.spacing(5),

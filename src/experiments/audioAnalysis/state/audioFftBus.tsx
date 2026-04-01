@@ -65,7 +65,6 @@ function computeFftAtTime(rec: AudioRecording, timeSec = 0, fftSize = 2048): Aud
         const real = spectrum[2 * i];
         const imag = spectrum[2 * i + 1];
         const mag = Math.sqrt(real * real + imag * imag);
-        // Normalize to amplitude (0..1) compensating FFT size and Hann coherent gain.
         const scaled = (2 * mag) / (size * windowGain);
         magnitudes[i] = scaled < EPS ? EPS : scaled;
         frequencies[i] = (i * rec.sampleRate) / size;
@@ -82,7 +81,6 @@ function applyHannWindow(buffer: Float32Array): number {
         buffer[i] *= w;
         sum += w;
     }
-    // Coherent gain (average window value) used for amplitude correction.
     return sum / len;
 }
 
@@ -114,7 +112,6 @@ function startRaf(busId: string) {
 
         lastFrameState.set(busId, { lastTime: targetTime, lastTs: ts });
 
-        // Publish on every animation frame for smoother updates.
         const frame = rec ? computeFftAtTime(rec, targetTime) : undefined;
         publish(frame, busId);
 

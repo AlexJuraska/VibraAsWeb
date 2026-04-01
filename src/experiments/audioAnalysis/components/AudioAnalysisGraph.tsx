@@ -147,7 +147,6 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
             const hue = Math.max(0, Math.min(120, (freq / nyquist) * 120));
             colors.push(`hsl(${hue}, 90%, 55%)`);
         }
-        // Ensure the Nyquist bin is included for full-width rendering.
         const lastIdx = fftFrame.magnitudes.length - 1;
         if (pts.length === 0 || pts[pts.length - 1].x < fftFrame.frequencies[lastIdx]) {
             pts.push({ x: fftFrame.frequencies[lastIdx], y: fftFrame.magnitudes[lastIdx] });

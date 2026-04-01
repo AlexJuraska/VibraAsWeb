@@ -8,7 +8,6 @@ export type LayoutModeContextType = {
 const defaultValue: LayoutModeContextType = {
     useDualLayout: false,
     toggleLayout: () => {
-        // no-op fallback to avoid runtime errors when provider is absent
     },
 };
 

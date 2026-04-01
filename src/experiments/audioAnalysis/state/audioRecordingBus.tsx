@@ -5,10 +5,8 @@ export type AudioRecording = {
     blob?: Blob;
 };
 
-// Listener for recording updates.
 type Listener = (rec: AudioRecording | undefined) => void;
 
-// Track recordings by bus id so multiple graphs can have independent datasets.
 const recordings = new Map<string, AudioRecording | undefined>();
 const listenersByBus = new Map<string, Set<Listener>>();
 
