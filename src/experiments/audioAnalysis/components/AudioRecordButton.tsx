@@ -60,8 +60,25 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
 
     const accumBufferRef = React.useRef<Float32Array>(new Float32Array(0));
     const totalSamplesRef = React.useRef<number>(0);
-    const publishIntervalMs = 50;
+    const publishIntervalMs = 120;
+    const maxPreviewSamples = 12000;
     const lastPublishRef = React.useRef<number>(0);
+
+    const buildPreview = React.useCallback((view: Float32Array, originalSampleRate: number) => {
+        if (view.length <= maxPreviewSamples) {
+            return { samples: new Float32Array(view), sampleRate: originalSampleRate };
+        }
+        const step = Math.max(1, Math.ceil(view.length / maxPreviewSamples));
+        const outLen = Math.ceil(view.length / step);
+        const preview = new Float32Array(outLen);
+        let w = 0;
+        for (let i = 0; i < view.length; i += step) {
+            preview[w++] = view[i];
+        }
+        const trimmed = w === outLen ? preview : preview.subarray(0, w);
+        const sampleRate = originalSampleRate / step;
+        return { samples: new Float32Array(trimmed), sampleRate };
+    }, []);
 
     const cleanup = () => {
         processorRef.current?.disconnect();
@@ -86,10 +103,9 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
     const publishLive = (sampleRate: number) => {
         if (totalSamplesRef.current === 0) return;
         const samplesView = accumBufferRef.current.subarray(0, totalSamplesRef.current);
-        const samples = new Float32Array(samplesView.length);
-        samples.set(samplesView);
-        const duration = samples.length / sampleRate;
-        audioRecordingBus.publish({ samples, sampleRate, duration }, busId);
+        const preview = buildPreview(samplesView, sampleRate);
+        const duration = totalSamplesRef.current / sampleRate;
+        audioRecordingBus.publish({ samples: preview.samples, sampleRate: preview.sampleRate, duration }, busId);
     };
 
     const startRecording = async () => {
@@ -105,8 +121,15 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
             totalSamplesRef.current = 0;
             lastPublishRef.current = performance.now();
 
+            const audioConstraints: MediaTrackConstraints = {
+                echoCancellation: false,
+            };
+            if (deviceId && deviceId !== "default") {
+                audioConstraints.deviceId = { exact: deviceId };
+            }
+
             const constraints: MediaStreamConstraints = {
-                audio: deviceId && deviceId !== "default" ? { deviceId: { exact: deviceId } } : true,
+                audio: audioConstraints,
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             streamRef.current = stream;

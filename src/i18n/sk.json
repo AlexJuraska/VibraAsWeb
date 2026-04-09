@@ -84,6 +84,12 @@
           "yAxis": "Amplitúda",
           "empty": "Nahrajte zvuk pre zobrazenie priebehu.",
           "dataset": "Záznam"
+        },
+        "frequencyGenerator": {
+          "title": "Generátor frekvencie",
+          "frequency": "Frekvencia",
+          "start": "Pustiť zvuk",
+          "stop": "Zastaviť zvuk"
         }
       }
     }

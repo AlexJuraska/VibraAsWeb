@@ -116,6 +116,11 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
         setSelected(deviceId);
     };
 
+    const safeSelected = React.useMemo(() => {
+        if (devices.some((d) => d.deviceId === selected)) return selected;
+        return "";
+    }, [devices, selected]);
+
     return (
         <Box className={className} style={style}>
             <Stack direction="row" spacing={1} alignItems="center">
@@ -125,9 +130,12 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
                         labelId="audio-input-label"
                         id="audio-input-select"
                         input={<OutlinedInput label={resolvedLabel} />}
-                        value={selected}
+                        value={safeSelected}
                         onChange={onChange}
                     >
+                        <MenuItem value="">
+                            {t("experiments.audioAnalysis.components.audioInputSelector.noDevice", "No device")}
+                        </MenuItem>
                         {devices.map((d) => (
                             <MenuItem key={d.deviceId} value={d.deviceId}>
                                 {d.label || (d.deviceId === "default"

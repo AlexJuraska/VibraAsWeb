@@ -22,6 +22,7 @@ const rafHandles = new Map<string, number>();
 const lastFrameState = new Map<string, { lastTime: number; lastTs: number }>();
 const EPS = 1e-12;
 const DEFAULT_FFT_SIZE = 2048;
+const PLAYBACK_FPS_MS = 33;
 
 function getListeners(busId: string): Set<Listener> {
     const existing = listenersByBus.get(busId);
@@ -96,13 +97,22 @@ function startRaf(busId: string) {
     if (rafHandles.has(busId)) return;
     const loop = (ts: number) => {
         const rec = recordingCache.get(busId);
-        if (!rec) {
+        if (!rec || !rec.blob) {
+            publish(undefined, busId);
             cancelRaf(busId);
             return;
         }
         const playback = playbackCache.get(busId);
         const duration = rec.duration ?? rec.samples.length / rec.sampleRate;
         const prev = lastFrameState.get(busId) ?? { lastTime: playback?.currentTime ?? 0, lastTs: ts };
+        if (!lastFrameState.has(busId)) {
+            lastFrameState.set(busId, prev);
+        }
+        if (ts - prev.lastTs < PLAYBACK_FPS_MS) {
+            const handle = requestAnimationFrame(loop);
+            rafHandles.set(busId, handle);
+            return;
+        }
 
         const hasCurrent = playback?.currentTime != null && !Number.isNaN(playback.currentTime);
         let targetTime = hasCurrent ? playback!.currentTime : prev.lastTime;
@@ -160,11 +170,26 @@ function ensureRecordingSubscription(busId: string) {
     if (recordingSubscriptions.has(busId)) return;
     const unsub = audioRecordingBus.subscribe((rec) => {
         recordingCache.set(busId, rec);
-        const peak = rec ? computeFftPeak(rec) : undefined;
-        peaks.set(busId, peak);
+        const isFinalizedRecording = !!rec?.blob;
+        if (isFinalizedRecording && rec) {
+            const peak = computeFftPeak(rec);
+            peaks.set(busId, peak);
+        } else if (!rec) {
+            peaks.set(busId, undefined);
+        }
         lastFrameState.delete(busId);
         cancelRaf(busId);
-        recompute(busId);
+        if (!rec) {
+            recompute(busId);
+            return;
+        }
+
+        if (isFinalizedRecording) {
+            recompute(busId);
+            return;
+        }
+        peaks.set(busId, undefined);
+        publish(undefined, busId);
     }, busId);
     recordingSubscriptions.set(busId, unsub);
     ensurePlaybackSubscription(busId);
@@ -186,6 +211,10 @@ function ensurePlaybackSubscription(busId: string) {
 
 function recompute(busId: string) {
     const rec = recordingCache.get(busId);
+    if (!rec || !rec.blob) {
+        publish(undefined, busId);
+        return;
+    }
     const playback = playbackCache.get(busId);
     const time = playback?.currentTime ?? 0;
     const frame = rec ? computeFftAtTime(rec, time) : undefined;

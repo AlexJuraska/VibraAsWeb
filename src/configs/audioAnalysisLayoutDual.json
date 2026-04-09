@@ -8,6 +8,8 @@
         "children": [
           { "component": "AudioInputDeviceSelector", "props": {} },
           { "component": "DividerLine", "props": {} },
+          { "component": "AudioFrequencyGenerator", "props": {} },
+          { "component": "DividerLine", "props": {} },
           { "component": "AudioRecordButton", "props": { "busId": "main" } },
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
           { "component": "AudioRecordingDebug", "props": { "busId": "main" } },

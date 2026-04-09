@@ -12,11 +12,12 @@ import {
     Legend,
     ChartOptions
 } from "chart.js";
+import zoomPlugin from "chartjs-plugin-zoom";
 import Box from "@mui/material/Box";
 import { useTheme, alpha } from "@mui/material/styles";
 import type { Theme } from "@mui/material/styles";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, zoomPlugin);
 
 export type Point = { x: number; y: number };
 
@@ -44,6 +45,8 @@ type Props = {
     className?: string;
     style?: React.CSSProperties;
     chartType?: "line" | "bar";
+    redrawToken?: number;
+    onChartReady?: (chart: any | null) => void;
 };
 
 const buildDefaultOptions = (theme: Theme): ChartOptions<"line" | "bar"> => ({
@@ -87,8 +90,17 @@ const isValidChartData = (d: any): d is ChartDataProps => {
     return d.datasets.every((ds: any) => Array.isArray(ds?.data));
 };
 
-const Graph: React.FC<Props> = ({ data, options, plugins, className, style, chartType = "line" }) => {
+const Graph: React.FC<Props> = ({ data, options, plugins, className, style, chartType = "line", redrawToken, onChartReady }) => {
     const theme = useTheme<Theme>();
+    const chartRef = React.useRef<any>(null);
+    const onChartReadyRef = React.useRef<typeof onChartReady>(onChartReady);
+    React.useEffect(() => {
+        onChartReadyRef.current = onChartReady;
+    }, [onChartReady]);
+    const setChartRef = React.useCallback((chart: any | null) => {
+        chartRef.current = chart;
+        onChartReadyRef.current?.(chart ?? null);
+    }, []);
 
     const emptyData = React.useMemo<ChartDataProps>(() => ({
         datasets: [
@@ -136,9 +148,22 @@ const Graph: React.FC<Props> = ({ data, options, plugins, className, style, char
 
     const ChartComponent = chartType === "bar" ? Bar : Line;
 
+    React.useEffect(() => {
+        if (redrawToken == null) return;
+        const chart = chartRef.current;
+        if (!chart) return;
+        chart.draw();
+    }, [redrawToken]);
+
+    React.useEffect(() => {
+        return () => {
+            onChartReadyRef.current?.(null);
+        };
+    }, []);
+
     return (
         <Box className={className} style={{ height: 360, ...style }}>
-            <ChartComponent data={themedData as any} options={mergedOptions as any} plugins={plugins as any} />
+            <ChartComponent ref={setChartRef} data={themedData as any} options={mergedOptions as any} plugins={plugins as any} />
         </Box>
     );
 };
