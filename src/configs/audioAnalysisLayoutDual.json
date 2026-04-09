@@ -1,7 +1,6 @@
 {
   "layout": "SlideLayout",
   "zones": {
-
     "CollapsiblePanel": {
       "component": "CollapsiblePanel",
       "props": {
@@ -13,14 +12,18 @@
           { "component": "DividerLine", "props": {} },
           { "component": "AudioRecordButton", "props": { "busId": "main" } },
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
-          { "component": "AudioRecordingDebug", "props": { "busId": "main" } }
+          { "component": "AudioRecordingDebug", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioRecordButton", "props": { "busId": "second" } },
+          { "component": "AudioFileUploader", "props": { "busId": "second" } },
+          { "component": "AudioRecordingDebug", "props": { "busId": "second" } }
         ]
       }
     },
 
     "topGraph": {
       "component": "AudioRecordingGraph",
-      "props": { "busId": "main", "label": "Waveform", "mode": "time" },
+      "props": { "busId": "main", "label": "Graph 1", "enableToggle": true, "initialView": "time" },
       "slideable": true,
       "slideLabel": "Top Graph",
       "slideDirection": "top",
@@ -30,9 +33,9 @@
 
     "bottomGraph": {
       "component": "AudioRecordingGraph",
-      "props": { "busId": "main", "label": "FFT", "mode": "freq" },
+      "props": { "busId": "second", "label": "Graph 2", "enableToggle": true, "initialView": "time" },
       "slideable": true,
-      "slideLabel": "FFT Graph",
+      "slideLabel": "Bottom Graph",
       "slideDirection": "bottom",
       "slideGroup": "topBottom",
       "defaultOpen": true
@@ -40,12 +43,11 @@
 
     "leftPanel": {
       "component": "AudioControlsPanel",
-      "props": {}
+      "props": { "showSecondControls": true }
     }
   },
 
   "grid": {
-
     "xs": {
       "areas": [
         ["CollapsiblePanel"],
@@ -66,3 +68,4 @@
     }
   }
 }
+

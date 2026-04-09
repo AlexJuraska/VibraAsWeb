@@ -84,6 +84,12 @@
           "yAxis": "Amplitude",
           "empty": "Record audio to see the waveform.",
           "dataset": "Recording"
+        },
+        "frequencyGenerator": {
+          "title": "Frequency Generator",
+          "frequency": "Frequency",
+          "start": "Start Sound",
+          "stop": "Stop Sound"
         }
 
       }

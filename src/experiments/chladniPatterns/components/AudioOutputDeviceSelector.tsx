@@ -146,6 +146,11 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
         }
     };
 
+    const safeSelected = React.useMemo(() => {
+        if (devices.some((d) => d.deviceId === selected)) return selected;
+        return "";
+    }, [devices, selected]);
+
     const disabled = !supportsSetSinkId || loading;
     const disabledReason = !supportsSetSinkId
         ? t("experiments.chladni.components.audioOutputSelector.browserNotSupported",
@@ -164,9 +169,12 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                             labelId="audio-output-label"
                             id="audio-output-select"
                             input={<OutlinedInput label={label} />}
-                            value={selected}
+                            value={safeSelected}
                             onChange={onChange}
                         >
+                            <MenuItem value="">
+                                {t("experiments.chladni.components.audioOutputSelector.noDevice", "No device")}
+                            </MenuItem>
                             {devices.map((d) => (
                                 <MenuItem key={d.deviceId} value={d.deviceId}>
                                     {d.label || (d.deviceId === "default" ?
