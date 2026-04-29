@@ -57,30 +57,18 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
     const processorRef = React.useRef<ScriptProcessorNode | null>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
     const sinkRef = React.useRef<GainNode | null>(null);
+    const isRecordingRef = React.useRef<boolean>(false);
 
     const accumBufferRef = React.useRef<Float32Array>(new Float32Array(0));
     const totalSamplesRef = React.useRef<number>(0);
-    const publishIntervalMs = 120;
-    const maxPreviewSamples = 12000;
+    const publishIntervalMs = 200;
     const lastPublishRef = React.useRef<number>(0);
 
-    const buildPreview = React.useCallback((view: Float32Array, originalSampleRate: number) => {
-        if (view.length <= maxPreviewSamples) {
-            return { samples: new Float32Array(view), sampleRate: originalSampleRate };
-        }
-        const step = Math.max(1, Math.ceil(view.length / maxPreviewSamples));
-        const outLen = Math.ceil(view.length / step);
-        const preview = new Float32Array(outLen);
-        let w = 0;
-        for (let i = 0; i < view.length; i += step) {
-            preview[w++] = view[i];
-        }
-        const trimmed = w === outLen ? preview : preview.subarray(0, w);
-        const sampleRate = originalSampleRate / step;
-        return { samples: new Float32Array(trimmed), sampleRate };
-    }, []);
-
     const cleanup = () => {
+        isRecordingRef.current = false;
+        if (processorRef.current) {
+            processorRef.current.onaudioprocess = null;
+        }
         processorRef.current?.disconnect();
         sinkRef.current?.disconnect();
         sourceRef.current?.disconnect();
@@ -102,10 +90,10 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
 
     const publishLive = (sampleRate: number) => {
         if (totalSamplesRef.current === 0) return;
-        const samplesView = accumBufferRef.current.subarray(0, totalSamplesRef.current);
-        const preview = buildPreview(samplesView, sampleRate);
+        // Use a lightweight view during live recording; final stop still publishes a full copied buffer.
+        const samples = accumBufferRef.current.subarray(0, totalSamplesRef.current);
         const duration = totalSamplesRef.current / sampleRate;
-        audioRecordingBus.publish({ samples: preview.samples, sampleRate: preview.sampleRate, duration }, busId);
+        audioRecordingBus.publish({ samples, sampleRate, duration }, busId);
     };
 
     const startRecording = async () => {
@@ -117,12 +105,15 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
         try {
             setError(null);
             setStatus("recording");
+            isRecordingRef.current = true;
             accumBufferRef.current = new Float32Array(0);
             totalSamplesRef.current = 0;
             lastPublishRef.current = performance.now();
 
             const audioConstraints: MediaTrackConstraints = {
                 echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
             };
             if (deviceId && deviceId !== "default") {
                 audioConstraints.deviceId = { exact: deviceId };
@@ -145,6 +136,7 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
             sinkRef.current = sink;
 
             processor.onaudioprocess = (event) => {
+                if (!isRecordingRef.current) return;
                 const input = event.inputBuffer.getChannelData(0);
                 const needed = totalSamplesRef.current + input.length;
                 let buf = accumBufferRef.current;
@@ -170,6 +162,7 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
             sink.connect(audioCtx.destination);
         } catch (err: any) {
             console.error(err);
+            isRecordingRef.current = false;
             if (err?.name === "NotAllowedError") {
                 setError(t("experiments.audioAnalysis.components.audioRecorder.permissionDenied", "Microphone permission denied."));
             } else if (err?.name === "NotFoundError") {
@@ -185,7 +178,11 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
     const stopRecording = () => {
         if (status !== "recording") return;
         setStatus("processing");
+        isRecordingRef.current = false;
 
+        if (processorRef.current) {
+            processorRef.current.onaudioprocess = null;
+        }
         processorRef.current?.disconnect();
         sourceRef.current?.disconnect();
         streamRef.current?.getTracks().forEach((t) => t.stop());

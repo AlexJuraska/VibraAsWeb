@@ -11,6 +11,10 @@ import { useTranslation } from "../../../i18n/i18n";
 import { useAudioFft, useAudioFftPeak } from "../state/audioFftBus";
 
 const MAX_POINTS = 5000;
+const LIVE_POINTS_PER_SECOND = 240;
+const LIVE_Y_SCAN_SAMPLES = 4000;
+const FFT_DISPLAY_MAX_HZ = 20000;
+
 type ViewMode = "time" | "freq";
 type InteractionMode = "zoom" | "cut";
 
@@ -60,6 +64,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     const chartRef = React.useRef<any>(null);
     const playheadTimeRef = React.useRef<number | null>(null);
     const zoomSyncRef = React.useRef<string>("");
+    const liveYBoundsRef = React.useRef<{ min: number; max: number; sampleCount: number; sampleRate: number } | null>(null);
 
     const graphView: ViewMode = enableToggle ? viewState : mode ?? "time";
 
@@ -72,6 +77,10 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     React.useEffect(() => {
         playheadTimeRef.current = playback?.currentTime ?? null;
     }, [playback?.currentTime]);
+
+    React.useEffect(() => {
+        liveYBoundsRef.current = null;
+    }, [busId]);
 
     React.useEffect(() => {
         chartRef.current?.resetZoom?.();
@@ -100,18 +109,55 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     }), [busId]);
 
     const timeYDomain = React.useMemo<{ min: number; max: number } | undefined>(() => {
-        if (!recording || recording.samples.length === 0) return undefined;
+        if (!recording || recording.samples.length === 0) {
+            liveYBoundsRef.current = null;
+            return undefined;
+        }
         let min = Number.POSITIVE_INFINITY;
         let max = Number.NEGATIVE_INFINITY;
         const s = recording.samples;
-        for (let i = 0; i < s.length; i++) {
+        const isLiveRecording = !recording.blob;
+        const scanStep = isLiveRecording
+            ? Math.max(1, Math.ceil(s.length / LIVE_Y_SCAN_SAMPLES))
+            : 1;
+        for (let i = 0; i < s.length; i += scanStep) {
             const y = s[i];
             if (y < min) min = y;
             if (y > max) max = y;
         }
+        if (scanStep > 1 && s.length > 0) {
+            const tail = s[s.length - 1];
+            if (tail < min) min = tail;
+            if (tail > max) max = tail;
+        }
         if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
             return { min: -1, max: 1 };
         }
+
+        if (isLiveRecording) {
+            const prev = liveYBoundsRef.current;
+            const isNewSession = !prev
+                || recording.sampleRate !== prev.sampleRate
+                || s.length < prev.sampleCount;
+            if (isNewSession) {
+                liveYBoundsRef.current = {
+                    min,
+                    max,
+                    sampleCount: s.length,
+                    sampleRate: recording.sampleRate,
+                };
+            } else {
+                if (min < prev.min) prev.min = min;
+                if (max > prev.max) prev.max = max;
+                prev.sampleCount = s.length;
+                prev.sampleRate = recording.sampleRate;
+            }
+            min = liveYBoundsRef.current.min;
+            max = liveYBoundsRef.current.max;
+        } else {
+            liveYBoundsRef.current = null;
+        }
+
         const pad = Math.max((max - min) * 0.1, 0.05);
         return { min: min - pad, max: max + pad };
     }, [recording]);
@@ -119,7 +165,9 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     const timeData = React.useMemo<ChartDataProps | undefined>(() => {
         if (!recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
 
-        const step = Math.max(1, Math.ceil(recording.samples.length / MAX_POINTS));
+        const isLiveRecording = !recording.blob;
+        const liveStep = Math.max(1, Math.floor(recording.sampleRate / LIVE_POINTS_PER_SECOND));
+        const step = isLiveRecording ? liveStep : Math.max(1, Math.ceil(recording.samples.length / MAX_POINTS));
         const pts: Point[] = [];
         for (let i = 0; i < recording.samples.length; i += step) {
             const y = recording.samples[i];
@@ -382,7 +430,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 type: "linear",
                 title: { display: true, text: t("experiments.audioAnalysis.components.graph.freqAxis", "Frequency (Hz)") },
                 min: 0,
-                max: fftFrame ? fftFrame.sampleRate / 2 : undefined,
+                max: FFT_DISPLAY_MAX_HZ,
                 offset: false,
             },
             y: {
@@ -392,7 +440,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 max: freqYMax,
             },
         },
-    }), [fftFrame, freqYMax, t]);
+    }), [freqYMax, t]);
 
     const activeData = graphView === "time" ? timeData : freqData;
     const activeOptions = graphView === "time" ? timeOptions : freqOptions;

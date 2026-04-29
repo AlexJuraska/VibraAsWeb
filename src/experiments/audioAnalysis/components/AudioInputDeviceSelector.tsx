@@ -61,7 +61,13 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
             const labelsMissing = list.every((d) => !d.label);
             if (labelsMissing) {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                        },
+                    });
                     stream.getTracks().forEach((t) => t.stop());
                     list = await navigator.mediaDevices.enumerateDevices();
                 } catch {
