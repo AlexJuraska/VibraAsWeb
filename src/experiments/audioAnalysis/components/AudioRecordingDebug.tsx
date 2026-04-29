@@ -5,7 +5,8 @@ import { audioPlaybackBus } from "../state/audioPlaybackBus";
 
 const AudioRecordingDebug: React.FC<{ busId?: string }> = ({ busId = "main" }) => {
     const recording = useAudioRecording(busId);
-    const [url, setUrl] = React.useState<string>("");const audioRef = React.useRef<HTMLAudioElement | null>(null);
+    const [url, setUrl] = React.useState<string>("");
+    const audioRef = React.useRef<HTMLAudioElement | null>(null);
     const rafRef = React.useRef<number | null>(null);
 
     React.useEffect(() => {
@@ -28,6 +29,11 @@ const AudioRecordingDebug: React.FC<{ busId?: string }> = ({ busId = "main" }) =
     }, [busId, recording]);
 
     const onTimeUpdate: React.ReactEventHandler<HTMLAudioElement> = (e) => {
+        const el = e.currentTarget;
+        audioPlaybackBus.publish({ currentTime: el.currentTime, duration: el.duration, playing: !el.paused }, busId);
+    };
+
+    const onSeeked: React.ReactEventHandler<HTMLAudioElement> = (e) => {
         const el = e.currentTarget;
         audioPlaybackBus.publish({ currentTime: el.currentTime, duration: el.duration, playing: !el.paused }, busId);
     };
@@ -79,6 +85,7 @@ const AudioRecordingDebug: React.FC<{ busId?: string }> = ({ busId = "main" }) =
                         controls
                         src={url}
                         onTimeUpdate={onTimeUpdate}
+                        onSeeked={onSeeked}
                         onPlay={(e) => onPlayPause(true, e.currentTarget)}
                         onPause={(e) => onPlayPause(false, e.currentTarget)}
                         onLoadedMetadata={(e) => onPlayPause(!e.currentTarget.paused, e.currentTarget)}
