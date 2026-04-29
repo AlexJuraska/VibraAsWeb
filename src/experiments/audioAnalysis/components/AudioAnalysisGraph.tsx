@@ -69,7 +69,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         }
     }, [enableToggle, initialView]);
 
-    React.useEffect(() => {
+    React.useLayoutEffect(() => {
         playheadTimeRef.current = playback?.currentTime ?? null;
     }, [playback?.currentTime]);
 
@@ -79,25 +79,27 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         setZoomWindow(null);
     }, [graphView, recording?.samples]);
 
-    const playheadPlugin = React.useMemo(() => ({
+    const drawPlayhead = React.useCallback((chart: any) => {
+        const currentTime = playheadTimeRef.current;
+        if (currentTime == null) return;
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea || !scales?.x) return;
+        const x = scales.x.getPixelForValue(currentTime);
+        if (!Number.isFinite(x)) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(220,0,0,0.9)";
+        ctx.stroke();
+        ctx.restore();
+    }, []);
+
+    const playheadPlugin = React.useMemo<any>(() => ({
         id: `playhead-${busId}`,
-        afterDraw: (chart: any) => {
-            const currentTime = playheadTimeRef.current;
-            if (currentTime == null) return;
-            const { ctx, chartArea, scales } = chart;
-            if (!chartArea || !scales?.x) return;
-            const x = scales.x.getPixelForValue(currentTime);
-            if (!Number.isFinite(x)) return;
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(x, chartArea.top);
-            ctx.lineTo(x, chartArea.bottom);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "rgba(220,0,0,0.9)";
-            ctx.stroke();
-            ctx.restore();
-        },
-    }), [busId]);
+        afterDraw: drawPlayhead,
+    }), [busId, drawPlayhead]);
 
     const timeYDomain = React.useMemo<{ min: number; max: number } | undefined>(() => {
         if (!recording || recording.samples.length === 0) return undefined;
