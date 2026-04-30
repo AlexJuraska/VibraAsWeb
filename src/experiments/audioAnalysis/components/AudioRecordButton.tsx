@@ -5,40 +5,43 @@ import StopIcon from "@mui/icons-material/Stop";
 import { useTranslation } from "../../../i18n/i18n";
 import { useAudioInputDevice } from "../state/audioInputDeviceBus";
 import { audioRecordingBus } from "../state/audioRecordingBus";
+import { encodeWav } from "../../../utils/encodeWav";
 
-function encodeWav(samples: Float32Array, sampleRate: number): Blob {
-    const dataSize = samples.length * 2;
-    const buffer = new ArrayBuffer(44 + dataSize);
-    const view = new DataView(buffer);
+const LIVE_WINDOW_SECONDS = 4;
+const PUBLISH_INTERVAL_MS = 50;
 
-    const writeString = (offset: number, str: string) => {
-        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    };
-
-    writeString(0, "RIFF");
-    view.setUint32(4, 36 + dataSize, true);
-    writeString(8, "WAVE");
-    writeString(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(36, "data");
-    view.setUint32(40, dataSize, true);
-
-    let offset = 44;
-    for (let i = 0; i < samples.length; i++, offset += 2) {
-        const s = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+const WORKLET_CODE = `
+class RecorderProcessor extends AudioWorkletProcessor {
+    constructor() {
+        super();
+        this._chunks = [];
+        this._totalLength = 0;
+        this._batchSamples = 2048;
     }
-
-    return new Blob([buffer], { type: "audio/wav" });
+    process(inputs) {
+        const channel = inputs[0] && inputs[0][0];
+        if (channel && channel.length > 0) {
+            this._chunks.push(new Float32Array(channel));
+            this._totalLength += channel.length;
+            if (this._totalLength >= this._batchSamples) {
+                const batch = new Float32Array(this._totalLength);
+                let offset = 0;
+                for (let i = 0; i < this._chunks.length; i++) {
+                    batch.set(this._chunks[i], offset);
+                    offset += this._chunks[i].length;
+                }
+                this.port.postMessage(batch, [batch.buffer]);
+                this._chunks = [];
+                this._totalLength = 0;
+            }
+        }
+        return true;
+    }
 }
+registerProcessor('recorder-processor', RecorderProcessor);
+`;
 
- type Status = "idle" | "recording" | "processing";
+type Status = "idle" | "recording" | "processing";
 
 type Props = {
     onRecordingComplete?: () => void;
@@ -54,45 +57,43 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
 
     const audioCtxRef = React.useRef<AudioContext | null>(null);
     const sourceRef = React.useRef<MediaStreamAudioSourceNode | null>(null);
-    const processorRef = React.useRef<ScriptProcessorNode | null>(null);
+    const workletNodeRef = React.useRef<AudioWorkletNode | null>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
-    const sinkRef = React.useRef<GainNode | null>(null);
     const isRecordingRef = React.useRef<boolean>(false);
 
     const accumBufferRef = React.useRef<Float32Array>(new Float32Array(0));
     const totalSamplesRef = React.useRef<number>(0);
-    const publishIntervalMs = 200;
     const lastPublishRef = React.useRef<number>(0);
 
     const cleanup = () => {
         isRecordingRef.current = false;
-        if (processorRef.current) {
-            processorRef.current.onaudioprocess = null;
+        if (workletNodeRef.current) {
+            workletNodeRef.current.port.onmessage = null;
+            workletNodeRef.current.disconnect();
+            workletNodeRef.current = null;
         }
-        processorRef.current?.disconnect();
-        sinkRef.current?.disconnect();
         sourceRef.current?.disconnect();
-        processorRef.current = null;
         sourceRef.current = null;
-        sinkRef.current = null;
         if (audioCtxRef.current) {
             audioCtxRef.current.close().catch(() => undefined);
             audioCtxRef.current = null;
         }
         if (streamRef.current) {
             streamRef.current.getTracks().forEach((t) => t.stop());
+            streamRef.current = null;
         }
-        streamRef.current = null;
         accumBufferRef.current = new Float32Array(0);
         totalSamplesRef.current = 0;
         lastPublishRef.current = 0;
     };
 
     const publishLive = (sampleRate: number) => {
-        if (totalSamplesRef.current === 0) return;
-        // Use a lightweight view during live recording; final stop still publishes a full copied buffer.
-        const samples = accumBufferRef.current.subarray(0, totalSamplesRef.current);
-        const duration = totalSamplesRef.current / sampleRate;
+        const total = totalSamplesRef.current;
+        if (total === 0) return;
+        const windowSamples = Math.floor(sampleRate * LIVE_WINDOW_SECONDS);
+        const start = Math.max(0, total - windowSamples);
+        const samples = accumBufferRef.current.slice(start, total);
+        const duration = samples.length / sampleRate;
         audioRecordingBus.publish({ samples, sampleRate, duration }, busId);
     };
 
@@ -119,47 +120,51 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
                 audioConstraints.deviceId = { exact: deviceId };
             }
 
-            const constraints: MediaStreamConstraints = {
-                audio: audioConstraints,
-            };
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
             streamRef.current = stream;
 
             const audioCtx = new AudioContext();
             audioCtxRef.current = audioCtx;
+
+            const blob = new Blob([WORKLET_CODE], { type: "application/javascript" });
+            const workletUrl = URL.createObjectURL(blob);
+            await audioCtx.audioWorklet.addModule(workletUrl);
+            URL.revokeObjectURL(workletUrl);
+
             const source = audioCtx.createMediaStreamSource(stream);
             sourceRef.current = source;
-            const processor = audioCtx.createScriptProcessor(2048, 1, 1);
-            processorRef.current = processor;
-            const sink = audioCtx.createGain();
-            sink.gain.value = 0;
-            sinkRef.current = sink;
 
-            processor.onaudioprocess = (event) => {
+            const workletNode = new AudioWorkletNode(audioCtx, "recorder-processor");
+            workletNodeRef.current = workletNode;
+
+            workletNode.port.onmessage = (event: MessageEvent<Float32Array>) => {
                 if (!isRecordingRef.current) return;
-                const input = event.inputBuffer.getChannelData(0);
-                const needed = totalSamplesRef.current + input.length;
+                const chunk = event.data;
+
+                const needed = totalSamplesRef.current + chunk.length;
                 let buf = accumBufferRef.current;
                 if (needed > buf.length) {
-                    const nextSize = Math.max(needed, buf.length * 2 || input.length * 2);
+                    const nextSize = Math.max(needed, buf.length * 2 || chunk.length * 2);
                     const expanded = new Float32Array(nextSize);
                     expanded.set(buf.subarray(0, totalSamplesRef.current));
                     buf = expanded;
                     accumBufferRef.current = buf;
                 }
-                buf.set(input, totalSamplesRef.current);
+                buf.set(chunk, totalSamplesRef.current);
                 totalSamplesRef.current = needed;
 
                 const now = performance.now();
-                if (now - lastPublishRef.current >= publishIntervalMs) {
+                if (now - lastPublishRef.current >= PUBLISH_INTERVAL_MS) {
                     lastPublishRef.current = now;
                     publishLive(audioCtx.sampleRate);
                 }
             };
 
-            source.connect(processor);
-            processor.connect(sink);
-            sink.connect(audioCtx.destination);
+            source.connect(workletNode);
+            const silentOut = audioCtx.createGain();
+            silentOut.gain.value = 0;
+            workletNode.connect(silentOut);
+            silentOut.connect(audioCtx.destination);
         } catch (err: any) {
             console.error(err);
             isRecordingRef.current = false;
@@ -180,10 +185,10 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
         setStatus("processing");
         isRecordingRef.current = false;
 
-        if (processorRef.current) {
-            processorRef.current.onaudioprocess = null;
+        if (workletNodeRef.current) {
+            workletNodeRef.current.port.onmessage = null;
+            workletNodeRef.current.disconnect();
         }
-        processorRef.current?.disconnect();
         sourceRef.current?.disconnect();
         streamRef.current?.getTracks().forEach((t) => t.stop());
 
@@ -229,4 +234,3 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
 };
 
 export default AudioRecordButton;
-

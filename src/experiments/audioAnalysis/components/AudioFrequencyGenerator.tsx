@@ -1,181 +1,164 @@
 import React from "react";
-import { Box, Stack, Slider, TextField, InputAdornment, Button, Typography } from "@mui/material";
-import AudioOutputDeviceSelector from "../../chladniPatterns/components/AudioOutputDeviceSelector";
+import { Box, FormControl, InputLabel, MenuItem, Select, Slider, Stack, TextField, InputAdornment, Button, Typography } from "@mui/material";
 import { useTranslation } from "../../../i18n/i18n";
 
 const MIN_FREQ = 40;
 const MAX_FREQ = 4000;
 const DEFAULT_FREQ = 440;
 const OUTPUT_GAIN = 0.2;
+const STORAGE_KEY = "audioAnalysis.sinkId";
 
-const clampFrequency = (value: number) => Math.max(MIN_FREQ, Math.min(MAX_FREQ, value));
+const clampFreq = (v: number) => Math.max(MIN_FREQ, Math.min(MAX_FREQ, v));
+
+const supportsCtxSinkId =
+    typeof AudioContext !== "undefined" && "setSinkId" in AudioContext.prototype;
+
+type OutputDevice = { deviceId: string; label: string };
 
 const AudioFrequencyGenerator: React.FC = () => {
     const { t } = useTranslation();
 
-    const [frequency, setFrequency] = React.useState<number>(DEFAULT_FREQ);
-    const [running, setRunning] = React.useState<boolean>(false);
+    const [frequency, setFrequency] = React.useState(DEFAULT_FREQ);
+    const [running, setRunning] = React.useState(false);
+    const [sinkId, setSinkId] = React.useState(
+        () => localStorage.getItem(STORAGE_KEY) ?? "default",
+    );
+    const [devices, setDevices] = React.useState<OutputDevice[]>([]);
 
-    const audioContextRef = React.useRef<AudioContext | null>(null);
-    const destinationRef = React.useRef<MediaStreamAudioDestinationNode | null>(null);
-    const oscillatorRef = React.useRef<OscillatorNode | null>(null);
+    const ctxRef = React.useRef<AudioContext | null>(null);
+    const oscRef = React.useRef<OscillatorNode | null>(null);
     const gainRef = React.useRef<GainNode | null>(null);
-    const stopTimeoutRef = React.useRef<number | null>(null);
-    const frequencyRafRef = React.useRef<number | null>(null);
-    const frequencyRef = React.useRef<number>(DEFAULT_FREQ);
-    const audioElementRef = React.useRef<HTMLAudioElement | null>(null);
+    const freqRef = React.useRef(DEFAULT_FREQ);
+    const sinkIdRef = React.useRef(sinkId);
+    const rafRef = React.useRef<number | null>(null);
 
-    const applyFrequencyToOscillator = React.useCallback(() => {
-        frequencyRafRef.current = null;
-        const ctx = audioContextRef.current;
-        const osc = oscillatorRef.current;
-        if (!ctx || !osc) return;
+    React.useEffect(() => {
+        sinkIdRef.current = sinkId;
+    }, [sinkId]);
 
-        const now = ctx.currentTime;
-        // Apply target at frame cadence to keep dragging fluid without overwhelming AudioParam scheduling.
-        osc.frequency.setTargetAtTime(frequencyRef.current, now, 0.01);
+    React.useEffect(() => {
+        if (!supportsCtxSinkId) return;
+        navigator.mediaDevices?.enumerateDevices().then((list) => {
+            const outs: OutputDevice[] = list
+                .filter((d) => d.kind === "audiooutput")
+                .map((d) => ({
+                    deviceId: d.deviceId,
+                    label: d.label || (d.deviceId === "default" ? "System default" : `Device …${d.deviceId.slice(-4)}`),
+                }));
+            if (!outs.some((d) => d.deviceId === "default")) {
+                outs.unshift({ deviceId: "default", label: "System default" });
+            }
+            setDevices(outs);
+        }).catch(() => {});
+
+        const refresh = () => {
+            navigator.mediaDevices?.enumerateDevices().then((list) => {
+                const outs: OutputDevice[] = list
+                    .filter((d) => d.kind === "audiooutput")
+                    .map((d) => ({
+                        deviceId: d.deviceId,
+                        label: d.label || (d.deviceId === "default" ? "System default" : `Device …${d.deviceId.slice(-4)}`),
+                    }));
+                if (!outs.some((d) => d.deviceId === "default")) {
+                    outs.unshift({ deviceId: "default", label: "System default" });
+                }
+                setDevices(outs);
+            }).catch(() => {});
+        };
+        navigator.mediaDevices?.addEventListener("devicechange", refresh);
+        return () => navigator.mediaDevices?.removeEventListener("devicechange", refresh);
     }, []);
 
-    const scheduleFrequencyApply = React.useCallback(() => {
-        if (!oscillatorRef.current) return;
-        if (frequencyRafRef.current != null) return;
-        frequencyRafRef.current = window.requestAnimationFrame(() => {
-            applyFrequencyToOscillator();
-        });
-    }, [applyFrequencyToOscillator]);
+    React.useEffect(() => {
+        const ctx = ctxRef.current;
+        if (!ctx || !supportsCtxSinkId) return;
+        void (ctx as any).setSinkId(sinkId === "default" ? "" : sinkId).catch(() => {});
+    }, [sinkId]);
 
-    const ensureAudioContext = React.useCallback(async () => {
-        if (!audioContextRef.current) {
-            const Ctx = (window as typeof window & { webkitAudioContext?: typeof AudioContext }).AudioContext
-                || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-            if (!Ctx) {
-                throw new Error("AudioContext is not supported in this browser.");
+    const getCtx = React.useCallback(async () => {
+        let ctx = ctxRef.current;
+        if (!ctx) {
+            ctx = new AudioContext();
+            ctxRef.current = ctx;
+            if (supportsCtxSinkId) {
+                const id = sinkIdRef.current;
+                await (ctx as any).setSinkId(id === "default" ? "" : id).catch(() => {});
             }
-            audioContextRef.current = new Ctx();
         }
-
-        const ctx = audioContextRef.current;
-        if (ctx.state === "suspended") {
-            await ctx.resume();
-        }
-
-        if (!destinationRef.current) {
-            destinationRef.current = ctx.createMediaStreamDestination();
-        }
-
-        if (!audioElementRef.current) {
-            const audio = document.createElement("audio");
-            audio.autoplay = true;
-            audio.muted = false;
-            audio.style.position = "fixed";
-            audio.style.left = "-9999px";
-            document.body.appendChild(audio);
-            audioElementRef.current = audio;
-        }
-
-        if (audioElementRef.current.srcObject !== destinationRef.current.stream) {
-            audioElementRef.current.srcObject = destinationRef.current.stream;
-            await audioElementRef.current.play().catch(() => undefined);
-        }
-
+        if (ctx.state === "suspended") await ctx.resume();
         return ctx;
     }, []);
 
+    const applyFrequency = React.useCallback(() => {
+        rafRef.current = null;
+        const osc = oscRef.current;
+        const ctx = ctxRef.current;
+        if (!osc || !ctx) return;
+        osc.frequency.setTargetAtTime(freqRef.current, ctx.currentTime, 0.01);
+    }, []);
+
+    const scheduleFreq = React.useCallback(() => {
+        if (rafRef.current != null) return;
+        rafRef.current = requestAnimationFrame(applyFrequency);
+    }, [applyFrequency]);
+
+    const startTone = React.useCallback(async () => {
+        if (oscRef.current) return;
+        const ctx = await getCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freqRef.current, ctx.currentTime);
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(OUTPUT_GAIN, ctx.currentTime + 0.02);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        oscRef.current = osc;
+        gainRef.current = gain;
+        setRunning(true);
+    }, [getCtx]);
+
     const stopTone = React.useCallback(() => {
-        const ctx = audioContextRef.current;
-        const osc = oscillatorRef.current;
+        const osc = oscRef.current;
         const gain = gainRef.current;
-
-        if (!ctx || !osc || !gain) {
-            setRunning(false);
-            return;
-        }
-
+        const ctx = ctxRef.current;
+        oscRef.current = null;
+        gainRef.current = null;
+        setRunning(false);
+        if (!osc || !gain || !ctx) return;
         const now = ctx.currentTime;
         gain.gain.cancelScheduledValues(now);
         gain.gain.setTargetAtTime(0, now, 0.02);
-
-        if (stopTimeoutRef.current != null) {
-            window.clearTimeout(stopTimeoutRef.current);
-            stopTimeoutRef.current = null;
-        }
-
-        stopTimeoutRef.current = window.setTimeout(() => {
-            try {
-                osc.stop();
-            } catch {
-                // Oscillator may already be stopped.
-            }
-            try {
-                osc.disconnect();
-                gain.disconnect();
-            } catch {
-                // Audio nodes may already be disconnected.
-            }
-            oscillatorRef.current = null;
-            gainRef.current = null;
-            setRunning(false);
-        }, 90);
+        osc.stop(now + 0.1);
+        osc.addEventListener("ended", () => {
+            try { osc.disconnect(); } catch { /* already disconnected */ }
+            try { gain.disconnect(); } catch { /* already disconnected */ }
+        });
     }, []);
-
-    const startTone = React.useCallback(async () => {
-        if (oscillatorRef.current) return;
-
-        const ctx = await ensureAudioContext();
-        const destination = destinationRef.current;
-        if (!destination) return;
-
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(frequencyRef.current, ctx.currentTime);
-
-        gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(OUTPUT_GAIN, ctx.currentTime + 0.03);
-
-        osc.connect(gain).connect(destination);
-        osc.start();
-
-        oscillatorRef.current = osc;
-        gainRef.current = gain;
-        setRunning(true);
-    }, [ensureAudioContext]);
 
     React.useEffect(() => {
         return () => {
-            stopTone();
-            if (stopTimeoutRef.current != null) {
-                window.clearTimeout(stopTimeoutRef.current);
-                stopTimeoutRef.current = null;
-            }
-            if (frequencyRafRef.current != null) {
-                window.cancelAnimationFrame(frequencyRafRef.current);
-                frequencyRafRef.current = null;
-            }
-            if (audioContextRef.current) {
-                void audioContextRef.current.close().catch(() => undefined);
-                audioContextRef.current = null;
-            }
-            destinationRef.current = null;
-            if (audioElementRef.current) {
-                if (audioElementRef.current.parentElement) {
-                    audioElementRef.current.parentElement.removeChild(audioElementRef.current);
-                }
-                audioElementRef.current = null;
-            }
+            if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+            const osc = oscRef.current;
+            const gain = gainRef.current;
+            const ctx = ctxRef.current;
+            oscRef.current = null;
+            gainRef.current = null;
+            ctxRef.current = null;
+            if (osc) { try { osc.stop(); } catch {} try { osc.disconnect(); } catch {} }
+            if (gain) { try { gain.disconnect(); } catch {} }
+            if (ctx) void ctx.close().catch(() => {});
         };
-    }, [stopTone]);
+    }, []);
 
-    const handleFrequencyInput = (value: string) => {
-        if (value === "") return;
-        const next = Number(value);
-        if (!Number.isFinite(next)) return;
-        const clamped = clampFrequency(next);
-        frequencyRef.current = clamped;
-        setFrequency(clamped);
-        scheduleFrequencyApply();
+    const handleFreqChange = (v: number) => {
+        const next = clampFreq(v);
+        freqRef.current = next;
+        setFrequency(next);
+        scheduleFreq();
     };
+
+    const safeSelected = devices.some((d) => d.deviceId === sinkId) ? sinkId : "default";
 
     return (
         <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1.5 }}>
@@ -184,11 +167,28 @@ const AudioFrequencyGenerator: React.FC = () => {
                     {t("experiments.audioAnalysis.components.frequencyGenerator.title", "Frequency Generator")}
                 </Typography>
 
-                <AudioOutputDeviceSelector
-                    audioRef={audioElementRef as React.RefObject<HTMLAudioElement>}
-                    storageKey="audioAnalysis.sinkId"
-                    fullWidth={true}
-                />
+                {supportsCtxSinkId && devices.length > 0 && (
+                    <FormControl size="small" fullWidth>
+                        <InputLabel>
+                            {t("experiments.chladni.components.audioOutputSelector.label", "Audio Output Device")}
+                        </InputLabel>
+                        <Select
+                            value={safeSelected}
+                            label={t("experiments.chladni.components.audioOutputSelector.label", "Audio Output Device")}
+                            onChange={(e) => {
+                                const id = e.target.value as string;
+                                setSinkId(id);
+                                localStorage.setItem(STORAGE_KEY, id);
+                            }}
+                        >
+                            {devices.map((d) => (
+                                <MenuItem key={d.deviceId} value={d.deviceId}>
+                                    {d.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                )}
 
                 <Stack direction="row" spacing={1} alignItems="center">
                     <TextField
@@ -196,7 +196,10 @@ const AudioFrequencyGenerator: React.FC = () => {
                         type="number"
                         size="small"
                         value={Math.round(frequency)}
-                        onChange={(e) => handleFrequencyInput(e.target.value)}
+                        onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (Number.isFinite(v)) handleFreqChange(v);
+                        }}
                         slotProps={{
                             input: {
                                 endAdornment: <InputAdornment position="end">Hz</InputAdornment>,
@@ -205,17 +208,10 @@ const AudioFrequencyGenerator: React.FC = () => {
                         }}
                         sx={{ minWidth: 140 }}
                     />
-
                     <Button
                         variant="contained"
                         color={running ? "error" : "primary"}
-                        onClick={() => {
-                            if (running) {
-                                stopTone();
-                            } else {
-                                void startTone();
-                            }
-                        }}
+                        onClick={() => (running ? stopTone() : void startTone())}
                     >
                         {running
                             ? t("experiments.audioAnalysis.components.frequencyGenerator.stop", "Stop Sound")
@@ -228,12 +224,7 @@ const AudioFrequencyGenerator: React.FC = () => {
                     min={MIN_FREQ}
                     max={MAX_FREQ}
                     step={1}
-                    onChange={(_, value) => {
-                        const next = clampFrequency(Array.isArray(value) ? value[0] : value);
-                        frequencyRef.current = next;
-                        setFrequency(next);
-                        scheduleFrequencyApply();
-                    }}
+                    onChange={(_, v) => handleFreqChange(Array.isArray(v) ? v[0] : v)}
                     aria-label={t("experiments.audioAnalysis.components.frequencyGenerator.frequency", "Frequency")}
                 />
             </Stack>
@@ -242,5 +233,3 @@ const AudioFrequencyGenerator: React.FC = () => {
 };
 
 export default AudioFrequencyGenerator;
-
-

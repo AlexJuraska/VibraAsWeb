@@ -13,7 +13,16 @@
           { "component": "DividerLine", "props": {} },
           { "component": "AudioRecordButton", "props": { "busId": "main" } },
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
-          { "component": "AudioRecordingDebug", "props": { "busId": "main" } }
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          {
+            "component": "HomeButton",
+            "props": {
+              "to": "/",
+              "color": "primary"
+            }
+          }
         ]
       }
     },
@@ -39,8 +48,28 @@
     },
 
     "leftPanel": {
-      "component": "AudioControlsPanel",
-      "props": {}
+      "component": "LayoutControlPanel",
+      "props": {
+        "busId": "main",
+        "children": [
+          { "component": "AudioInputDeviceSelector", "props": {} },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioFrequencyGenerator", "props": {} },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioRecordButton", "props": { "busId": "main" } },
+          { "component": "AudioFileUploader", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioPlayer", "props": { "busId": "main" } }
+        ]
+      }
+    },
+
+    "homeButton": {
+      "component": "HomeButton",
+      "props": {
+        "to": "/",
+        "color": "primary"
+      }
     }
   },
 
@@ -59,10 +88,11 @@
     "xl": {
       "areas": [
         ["leftPanel", "topGraph"],
-        ["leftPanel", "bottomGraph"]
+        ["leftPanel", "bottomGraph"],
+        ["homeButton", "bottomGraph"]
       ],
       "columns": ["2fr", "8fr"],
-      "rows": ["1fr", "1fr"]
+      "rows": ["1fr", "1fr", "80px"]
     }
   }
 }

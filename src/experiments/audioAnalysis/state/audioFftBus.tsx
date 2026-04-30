@@ -24,6 +24,13 @@ const EPS = 1e-12;
 const DEFAULT_FFT_SIZE = 2048;
 const PLAYBACK_FPS_MS = 33;
 
+const fftInstances = new Map<number, FFT>();
+function getFft(size: number): FFT {
+    let inst = fftInstances.get(size);
+    if (!inst) { inst = new FFT(size); fftInstances.set(size, inst); }
+    return inst;
+}
+
 function getListeners(busId: string): Set<Listener> {
     const existing = listenersByBus.get(busId);
     if (existing) return existing;
@@ -53,7 +60,7 @@ function computeFftAtTime(rec: AudioRecording, timeSec = 0, fftSize = 2048): Aud
     if (available > 0) input.set(rec.samples.subarray(start, start + available));
     const windowGain = applyHannWindow(input);
 
-    const fft = new FFT(size);
+    const fft = getFft(size);
     const spectrum = fft.createComplexArray();
     fft.realTransform(spectrum, input);
     fft.completeSpectrum(spectrum);
@@ -143,7 +150,7 @@ function nextPowerOfTwo(n: number): number {
 function computeFftPeak(rec: AudioRecording, fftSize = DEFAULT_FFT_SIZE, hop = fftSize / 2): number | undefined {
     if (!rec.samples || rec.samples.length === 0 || rec.sampleRate <= 0) return undefined;
     const size = Math.max(2, nextPowerOfTwo(Math.min(rec.samples.length, fftSize)));
-    const fft = new FFT(size);
+    const fft = getFft(size);
     const spectrum = fft.createComplexArray();
     const buffer = new Float32Array(size);
     let max = 0;

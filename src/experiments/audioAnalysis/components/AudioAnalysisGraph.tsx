@@ -1,5 +1,7 @@
 import React from "react";
-import { Stack, ButtonGroup, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Slider, IconButton } from "@mui/material";
+import { Stack, ButtonGroup, Button, Checkbox, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Slider, IconButton } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import type { Theme } from "@mui/material/styles";
 import ArrowLeftIcon from "@mui/icons-material/ArrowLeft";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import Graph from "../../../components/Graph";
@@ -9,46 +11,253 @@ import { audioRecordingBus, useAudioRecording } from "../state/audioRecordingBus
 import { audioPlaybackBus, useAudioPlayback } from "../state/audioPlaybackBus";
 import { useTranslation } from "../../../i18n/i18n";
 import { useAudioFft, useAudioFftPeak } from "../state/audioFftBus";
+import { encodeWav } from "../../../utils/encodeWav";
 
-const MAX_POINTS = 5000;
-const LIVE_POINTS_PER_SECOND = 240;
-const LIVE_Y_SCAN_SAMPLES = 4000;
+const MAX_POINTS = 15000;
 const FFT_DISPLAY_MAX_HZ = 20000;
 
 type ViewMode = "time" | "freq";
 type InteractionMode = "zoom" | "cut";
 
-function encodeWav(samples: Float32Array, sampleRate: number): Blob {
-    const dataSize = samples.length * 2;
-    const buffer = new ArrayBuffer(44 + dataSize);
-    const view = new DataView(buffer);
 
-    const writeString = (offset: number, str: string) => {
-        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    };
+function niceTicks(min: number, max: number, targetCount: number): number[] {
+    if (max <= min || targetCount < 1) return [];
+    const range = max - min;
+    const rawStep = range / Math.max(1, targetCount);
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= rawStep) ?? mag;
+    const start = Math.ceil((min + step * 1e-9) / step) * step;
+    const ticks: number[] = [];
+    for (let t = start; t < max - step * 1e-9; t += step) {
+        ticks.push(Number(t.toFixed(10)));
+    }
+    return ticks;
+}
 
-    writeString(0, "RIFF");
-    view.setUint32(4, 36 + dataSize, true);
-    writeString(8, "WAVE");
-    writeString(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(36, "data");
-    view.setUint32(40, dataSize, true);
+const WAVEFORM_COLOR = "#1976d2";
+const WAVEFORM_FILL = "rgba(25, 118, 210, 0.2)";
 
-    let offset = 44;
-    for (let i = 0; i < samples.length; i++, offset += 2) {
-        const s = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+const PAD_LEFT = 52;
+const PAD_RIGHT = 12;
+const PAD_TOP = 8;
+const PAD_BOTTOM = 40;
+
+function drawLiveWaveform(
+    canvas: HTMLCanvasElement,
+    samples: Float32Array,
+    sampleRate: number,
+    yBoundsRef: { current: { min: number; max: number } | null },
+    theme: Theme,
+    xLabel: string,
+    yLabel: string,
+) {
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.clientWidth;
+    const cssH = canvas.clientHeight;
+    if (cssW === 0 || cssH === 0) return;
+
+    if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
+        canvas.width = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
     }
 
-    return new Blob([buffer], { type: "audio/wav" });
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const chartL = PAD_LEFT;
+    const chartT = PAD_TOP;
+    const chartW = Math.max(1, cssW - PAD_LEFT - PAD_RIGHT);
+    const chartH = Math.max(1, cssH - PAD_TOP - PAD_BOTTOM);
+
+    let yMin = Infinity;
+    let yMax = -Infinity;
+    for (let i = 0; i < samples.length; i++) {
+        const v = samples[i];
+        if (v < yMin) yMin = v;
+        if (v > yMax) yMax = v;
+    }
+    if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) { yMin = -1; yMax = 1; }
+
+    const prev = yBoundsRef.current;
+    if (!prev) {
+        yBoundsRef.current = { min: yMin, max: yMax };
+    } else {
+        if (yMin < prev.min) prev.min = yMin;
+        if (yMax > prev.max) prev.max = yMax;
+    }
+    yMin = yBoundsRef.current!.min;
+    yMax = yBoundsRef.current!.max;
+
+    if (yMin === yMax) { yMin -= 1; yMax += 1; }
+    const yPad = Math.max((yMax - yMin) * 0.1, 0.05);
+    yMin -= yPad;
+    yMax += yPad;
+
+    const duration = samples.length / sampleRate;
+
+    const toX = (t: number) => chartL + (t / duration) * chartW;
+    const toY = (v: number) => chartT + (1 - (v - yMin) / (yMax - yMin)) * chartH;
+
+    const divider = theme.palette.divider;
+    const textSec = theme.palette.text.secondary;
+    const textPri = theme.palette.text.primary;
+    const fontFamily = (theme.typography.fontFamily as string)?.split(",")[0]?.trim() ?? "sans-serif";
+    const tickFont = `12px ${fontFamily}`;
+    const labelFont = `12px ${fontFamily}`;
+
+    ctx.lineWidth = 1;
+
+    const yTicks = niceTicks(yMin, yMax, Math.max(2, Math.floor(chartH / 40)));
+    ctx.font = tickFont;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (const tick of yTicks) {
+        const py = toY(tick);
+        ctx.strokeStyle = divider;
+        ctx.beginPath(); ctx.moveTo(chartL, py); ctx.lineTo(chartL + chartW, py); ctx.stroke();
+        ctx.fillStyle = textSec;
+        ctx.fillText(parseFloat(tick.toFixed(3)).toString(), chartL - 6, py);
+    }
+
+    const xTicks = niceTicks(0, duration, Math.max(2, Math.floor(chartW / 60)));
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    for (const tick of xTicks) {
+        const px = toX(tick);
+        ctx.strokeStyle = divider;
+        ctx.beginPath(); ctx.moveTo(px, chartT); ctx.lineTo(px, chartT + chartH); ctx.stroke();
+        ctx.fillStyle = textSec;
+        ctx.fillText(parseFloat(tick.toFixed(2)).toString(), px, chartT + chartH + 4);
+    }
+
+    ctx.strokeStyle = divider;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(chartL, chartT, chartW, chartH);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chartL, chartT, chartW, chartH);
+    ctx.clip();
+
+    const topPts = new Float64Array(chartW);
+    const botPts = new Float64Array(chartW);
+    for (let px = 0; px < chartW; px++) {
+        const tS = (px / chartW) * duration;
+        const tE = ((px + 1) / chartW) * duration;
+        const iS = Math.floor(tS * sampleRate);
+        const iE = Math.min(samples.length - 1, Math.ceil(tE * sampleRate));
+        let lo = 0;
+        let hi = 0;
+        for (let i = iS; i <= iE; i++) {
+            const v = samples[i];
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+        }
+        topPts[px] = toY(hi);
+        botPts[px] = toY(lo);
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(chartL, topPts[0]);
+    for (let px = 1; px < chartW; px++) ctx.lineTo(chartL + px, topPts[px]);
+    for (let px = chartW - 1; px >= 0; px--) ctx.lineTo(chartL + px, botPts[px]);
+    ctx.closePath();
+    ctx.fillStyle = WAVEFORM_FILL;
+    ctx.fill();
+
+    ctx.strokeStyle = WAVEFORM_COLOR;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(chartL, topPts[0]);
+    for (let px = 1; px < chartW; px++) ctx.lineTo(chartL + px, topPts[px]);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(chartL, botPts[0]);
+    for (let px = 1; px < chartW; px++) ctx.lineTo(chartL + px, botPts[px]);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.font = labelFont;
+    ctx.fillStyle = textPri;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(xLabel, chartL + chartW / 2, cssH - 2);
+
+    ctx.save();
+    ctx.translate(10, chartT + chartH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(yLabel, 0, 0);
+    ctx.restore();
 }
+
+const LiveWaveformCanvas: React.FC<{
+    busId: string;
+    xLabel: string;
+    yLabel: string;
+    style?: React.CSSProperties;
+}> = ({ busId, xLabel, yLabel, style }) => {
+    const theme = useTheme<Theme>();
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const yBoundsRef = React.useRef<{ min: number; max: number } | null>(null);
+    const pendingRef = React.useRef<{ samples: Float32Array; sampleRate: number } | null>(null);
+    const dirtyRef = React.useRef(false);
+    const drawParamsRef = React.useRef({ theme, xLabel, yLabel });
+
+    React.useEffect(() => {
+        drawParamsRef.current = { theme, xLabel, yLabel };
+    });
+
+    React.useEffect(() => {
+        yBoundsRef.current = null;
+        pendingRef.current = null;
+        dirtyRef.current = false;
+
+        const unsub = audioRecordingBus.subscribe((rec) => {
+            pendingRef.current = (rec && rec.samples.length > 0 && rec.sampleRate > 0)
+                ? { samples: rec.samples, sampleRate: rec.sampleRate }
+                : null;
+            dirtyRef.current = true;
+        }, busId);
+
+        let rafId: number;
+        const loop = () => {
+            if (dirtyRef.current) {
+                dirtyRef.current = false;
+                const canvas = canvasRef.current;
+                if (canvas) {
+                    const data = pendingRef.current;
+                    if (data) {
+                        const { theme: t, xLabel: xl, yLabel: yl } = drawParamsRef.current;
+                        drawLiveWaveform(canvas, data.samples, data.sampleRate, yBoundsRef, t, xl, yl);
+                    } else {
+                        const ctx = canvas.getContext("2d");
+                        ctx?.clearRect(0, 0, canvas.width, canvas.height);
+                    }
+                }
+            }
+            rafId = requestAnimationFrame(loop);
+        };
+        rafId = requestAnimationFrame(loop);
+
+        return () => {
+            unsub();
+            cancelAnimationFrame(rafId);
+        };
+    }, [busId]);
+
+    return (
+        <div style={{ width: "100%", height: "100%", ...style }}>
+            <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+        </div>
+    );
+};
+
 
 const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: ViewMode; initialView?: ViewMode; enableToggle?: boolean }> = ({ busId = "main", label, mode, initialView = "time", enableToggle = false }) => {
     const { t } = useTranslation();
@@ -61,12 +270,15 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     const [interactionMode, setInteractionMode] = React.useState<InteractionMode>("zoom");
     const [cutSelection, setCutSelection] = React.useState<{ start: number; end: number } | null>(null);
     const [zoomWindow, setZoomWindow] = React.useState<{ start: number; end: number; fullMin: number; fullMax: number } | null>(null);
+    const [autoTooltip, setAutoTooltip] = React.useState(false);
     const chartRef = React.useRef<any>(null);
     const playheadTimeRef = React.useRef<number | null>(null);
     const zoomSyncRef = React.useRef<string>("");
-    const liveYBoundsRef = React.useRef<{ min: number; max: number; sampleCount: number; sampleRate: number } | null>(null);
+    const suppressCutRef = React.useRef(false);
 
     const graphView: ViewMode = enableToggle ? viewState : mode ?? "time";
+    const isLiveRecording = !!recording && !recording.blob;
+    const showLiveCanvas = isLiveRecording && graphView === "time";
 
     React.useEffect(() => {
         if (enableToggle) {
@@ -79,14 +291,10 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     }, [playback?.currentTime]);
 
     React.useEffect(() => {
-        liveYBoundsRef.current = null;
-    }, [busId]);
-
-    React.useEffect(() => {
         chartRef.current?.resetZoom?.();
         setCutSelection(null);
         setZoomWindow(null);
-    }, [graphView, recording?.samples]);
+    }, [graphView, recording?.blob]);
 
     const drawPlayhead = React.useCallback((chart: any) => {
         const currentTime = playheadTimeRef.current;
@@ -111,77 +319,45 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     }), [busId, drawPlayhead]);
 
     const timeYDomain = React.useMemo<{ min: number; max: number } | undefined>(() => {
-        if (!recording || recording.samples.length === 0) {
-            liveYBoundsRef.current = null;
-            return undefined;
-        }
+        if (isLiveRecording || !recording || recording.samples.length === 0) return undefined;
+        const s = recording.samples;
         let min = Number.POSITIVE_INFINITY;
         let max = Number.NEGATIVE_INFINITY;
-        const s = recording.samples;
-        const isLiveRecording = !recording.blob;
-        const scanStep = isLiveRecording
-            ? Math.max(1, Math.ceil(s.length / LIVE_Y_SCAN_SAMPLES))
-            : 1;
-        for (let i = 0; i < s.length; i += scanStep) {
+        const step = Math.max(1, Math.ceil(s.length / 2_000_000));
+        for (let i = 0; i < s.length; i += step) {
             const y = s[i];
             if (y < min) min = y;
             if (y > max) max = y;
         }
-        if (scanStep > 1 && s.length > 0) {
-            const tail = s[s.length - 1];
-            if (tail < min) min = tail;
-            if (tail > max) max = tail;
-        }
-        if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-            return { min: -1, max: 1 };
-        }
-
-        if (isLiveRecording) {
-            const prev = liveYBoundsRef.current;
-            const isNewSession = !prev
-                || recording.sampleRate !== prev.sampleRate
-                || s.length < prev.sampleCount;
-            if (isNewSession) {
-                liveYBoundsRef.current = {
-                    min,
-                    max,
-                    sampleCount: s.length,
-                    sampleRate: recording.sampleRate,
-                };
-            } else {
-                if (min < prev.min) prev.min = min;
-                if (max > prev.max) prev.max = max;
-                prev.sampleCount = s.length;
-                prev.sampleRate = recording.sampleRate;
-            }
-            min = liveYBoundsRef.current.min;
-            max = liveYBoundsRef.current.max;
-        } else {
-            liveYBoundsRef.current = null;
-        }
-
+        if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return { min: -1, max: 1 };
         const pad = Math.max((max - min) * 0.1, 0.05);
         return { min: min - pad, max: max + pad };
-    }, [recording]);
+    }, [isLiveRecording, recording]);
 
     const timeData = React.useMemo<ChartDataProps | undefined>(() => {
-        if (!recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
+        if (isLiveRecording || !recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
 
-        const isLiveRecording = !recording.blob;
-        const liveStep = Math.max(1, Math.floor(recording.sampleRate / LIVE_POINTS_PER_SECOND));
-        const step = isLiveRecording ? liveStep : Math.max(1, Math.ceil(recording.samples.length / MAX_POINTS));
+        const { samples, sampleRate } = recording;
+        const step = Math.max(1, Math.ceil(samples.length / MAX_POINTS));
         const pts: Point[] = [];
-        for (let i = 0; i < recording.samples.length; i += step) {
-            const y = recording.samples[i];
-            const x = i / recording.sampleRate;
-            pts.push({ x, y });
-        }
 
-        const lastIdx = recording.samples.length - 1;
-        const lastX = lastIdx / recording.sampleRate;
-        const lastY = recording.samples[lastIdx];
-        if (pts.length === 0 || pts[pts.length - 1].x < lastX) {
-            pts.push({ x: lastX, y: lastY });
+        for (let i = 0; i < samples.length; i += step) {
+            const end = Math.min(i + step, samples.length);
+            let minIdx = i;
+            let maxIdx = i;
+            for (let j = i + 1; j < end; j++) {
+                if (samples[j] < samples[minIdx]) minIdx = j;
+                if (samples[j] > samples[maxIdx]) maxIdx = j;
+            }
+            if (minIdx === maxIdx) {
+                pts.push({ x: minIdx / sampleRate, y: samples[minIdx] });
+            } else if (minIdx < maxIdx) {
+                pts.push({ x: minIdx / sampleRate, y: samples[minIdx] });
+                pts.push({ x: maxIdx / sampleRate, y: samples[maxIdx] });
+            } else {
+                pts.push({ x: maxIdx / sampleRate, y: samples[maxIdx] });
+                pts.push({ x: minIdx / sampleRate, y: samples[minIdx] });
+            }
         }
 
         return {
@@ -195,7 +371,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 },
             ],
         };
-    }, [label, recording, t]);
+    }, [isLiveRecording, label, recording, t]);
 
     const freqYMax = React.useMemo(() => {
         if (!fftFrame || fftFrame.magnitudes.length === 0) return 1;
@@ -242,9 +418,9 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     }, [fftFrame, label, t]);
 
     const durationSec = React.useMemo(() => {
-        if (!recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
+        if (isLiveRecording || !recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
         return recording.samples.length / recording.sampleRate;
-    }, [recording]);
+    }, [isLiveRecording, recording]);
 
     const syncZoomWindow = React.useCallback((chart: any) => {
         if (!chart || !durationSec || graphView !== "time") {
@@ -306,6 +482,10 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
             syncZoomWindow(chart);
             return;
         }
+        if (suppressCutRef.current) {
+            suppressCutRef.current = false;
+            return;
+        }
         const xScale = chart?.scales?.x;
         if (!xScale) return;
 
@@ -331,6 +511,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     }, []);
 
     const handleCancelCut = React.useCallback(() => {
+        suppressCutRef.current = true;
         setCutSelection(null);
         chartRef.current?.resetZoom?.();
         chartRef.current?.update?.("none");
@@ -384,10 +565,36 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         syncZoomWindow(chart);
     }, [durationSec, graphView, interactionMode, playback?.currentTime, syncZoomWindow]);
 
+    React.useEffect(() => {
+        if (graphView !== "time" || !zoomWindow) return;
+        const chart = chartRef.current;
+        const xScale = chart?.scales?.x;
+        if (!chart || !xScale) return;
+
+        const currentMin = Number(xScale.min);
+        const currentMax = Number(xScale.max);
+        const same = Number.isFinite(currentMin) && Number.isFinite(currentMax)
+            && Math.abs(currentMin - zoomWindow.start) < 1e-6
+            && Math.abs(currentMax - zoomWindow.end) < 1e-6;
+        if (same) return;
+
+        if (typeof chart.zoomScale === "function") {
+            chart.zoomScale("x", { min: zoomWindow.start, max: zoomWindow.end }, "none");
+        } else {
+            if (!chart.options.scales) chart.options.scales = {};
+            const xScaleOptions: any = chart.options.scales.x ?? {};
+            xScaleOptions.min = zoomWindow.start;
+            xScaleOptions.max = zoomWindow.end;
+            chart.options.scales.x = xScaleOptions;
+            chart.update("none");
+        }
+    }, [graphView, zoomWindow]);
+
     const timeOptions = React.useMemo<ChartOptions<"bar" | "line">>(() => ({
         animation: false,
         plugins: {
             legend: { display: false },
+            tooltip: autoTooltip ? { mode: "index", intersect: false } : {},
             zoom: {
                 limits: {
                     x: { min: "original", max: "original", minRange: 0.01 },
@@ -402,7 +609,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                         borderColor: "rgba(25, 118, 210, 0.8)",
                         borderWidth: 1,
                     },
-                    wheel: { enabled: false },
+                    wheel: { enabled: true },
                     pinch: { enabled: false },
                     onZoomComplete,
                 },
@@ -412,8 +619,8 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
             x: {
                 type: "linear",
                 title: { display: true, text: t("experiments.audioAnalysis.components.graph.xAxis", "Time (s)") },
-                min: 0,
-                max: durationSec,
+                min: zoomWindow?.start ?? 0,
+                max: zoomWindow?.end ?? durationSec,
             },
             y: {
                 type: "linear",
@@ -422,7 +629,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 max: timeYDomain?.max ?? 1,
             },
         },
-    }), [durationSec, onZoomComplete, t, timeYDomain]);
+    }), [autoTooltip, durationSec, onZoomComplete, t, timeYDomain, zoomWindow]);
 
     const freqOptions = React.useMemo<ChartOptions<"bar" | "line">>(() => ({
         animation: false,
@@ -465,7 +672,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                     </Button>
                 </ButtonGroup>
             )}
-            {graphView === "time" && (
+            {graphView === "time" && !isLiveRecording && (
                 <>
                     <ButtonGroup size="small" variant="outlined">
                         <Button variant={interactionMode === "zoom" ? "contained" : "outlined"} onClick={() => setInteractionMode("zoom")}>
@@ -482,6 +689,17 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                     <Button size="small" variant="outlined" onClick={handleResetZoom}>
                         {t("experiments.audioAnalysis.components.graph.resetZoom", "Reset")}
                     </Button>
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                size="small"
+                                checked={autoTooltip}
+                                onChange={(e) => setAutoTooltip(e.target.checked)}
+                            />
+                        }
+                        label={t("experiments.audioAnalysis.components.graph.autoTooltip", "Auto-display values")}
+                        slotProps={{ typography: { variant: "body2" } }}
+                    />
                 </>
             )}
         </Stack>
@@ -490,7 +708,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     return (
         <Stack spacing={1} sx={{ height: "100%" }}>
             {topControls}
-            {graphView === "time" && interactionMode === "zoom" && zoomWindow && (
+            {graphView === "time" && interactionMode === "zoom" && zoomWindow && !isLiveRecording && (
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 0.5 }}>
                     <IconButton
                         size="small"
@@ -516,7 +734,14 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                     </IconButton>
                 </Stack>
             )}
-            {activeData ? (
+            {showLiveCanvas ? (
+                <LiveWaveformCanvas
+                    busId={busId}
+                    xLabel={t("experiments.audioAnalysis.components.graph.xAxis", "Time (s)")}
+                    yLabel={t("experiments.audioAnalysis.components.graph.yAxis", "Amplitude")}
+                    style={{ width: "100%", height: "100%" }}
+                />
+            ) : activeData ? (
                 <Graph
                     key={`${busId}-${graphView}`}
                     data={activeData}

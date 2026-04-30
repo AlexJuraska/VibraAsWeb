@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Box, IconButton, Drawer, useTheme } from "@mui/material";
 import { Menu as MenuIcon, ChevronLeft } from "@mui/icons-material";
 import { ComponentMap } from "../layout-system/types/ComponentMap";
+import { useAudioRecording } from "../experiments/audioAnalysis/state/audioRecordingBus";
+import AudioPlayer from "../experiments/audioAnalysis/components/AudioPlayer";
 
 interface PanelChild {
     component: keyof ComponentMap;
@@ -15,12 +17,40 @@ interface CollapsiblePanelProps {
 }
 
 const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
-                                                               collapsed = false,
-                                                               components,
-                                                               children = [],
-                                                           }) => {
+    collapsed = false,
+    components,
+    children = [],
+}) => {
     const [open, setOpen] = useState(!collapsed);
     const theme = useTheme();
+    const recordingMain = useAudioRecording("main");
+    const recordingSecond = useAudioRecording("second");
+    const [urlMain, setUrlMain] = React.useState<string>("");
+    const [urlSecond, setUrlSecond] = React.useState<string>("");
+
+    React.useEffect(() => {
+        if (urlMain) URL.revokeObjectURL(urlMain);
+        if (recordingMain?.blob) {
+            setUrlMain(URL.createObjectURL(recordingMain.blob));
+        } else {
+            setUrlMain("");
+        }
+        return () => {
+            if (urlMain) URL.revokeObjectURL(urlMain);
+        };
+    }, [recordingMain?.blob]);
+
+    React.useEffect(() => {
+        if (urlSecond) URL.revokeObjectURL(urlSecond);
+        if (recordingSecond?.blob) {
+            setUrlSecond(URL.createObjectURL(recordingSecond.blob));
+        } else {
+            setUrlSecond("");
+        }
+        return () => {
+            if (urlSecond) URL.revokeObjectURL(urlSecond);
+        };
+    }, [recordingSecond?.blob]);
 
     const toggle = () => setOpen((prev) => !prev);
 
@@ -33,6 +63,14 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
     );
 
     const render = (child: PanelChild, i: number) => {
+        if (child.component === "AudioPlayer") {
+            const playerBusId = child.props?.busId || "main";
+            const recording = playerBusId === "main" ? recordingMain : recordingSecond;
+            const playerUrl = playerBusId === "main" ? urlMain : urlSecond;
+
+            return <AudioPlayer key={i} url={playerUrl || null} busId={playerBusId} disabled={!recording || !playerUrl} />;
+        }
+
         const Comp = components[child.component] as React.ComponentType<any>;
         return <Comp key={i} {...child.props} components={components} />;
     };
