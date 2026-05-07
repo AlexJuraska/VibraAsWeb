@@ -259,6 +259,7 @@ const LiveWaveformCanvas: React.FC<{
 };
 
 
+
 const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: ViewMode; initialView?: ViewMode; enableToggle?: boolean }> = ({ busId = "main", label, mode, initialView = "time", enableToggle = false }) => {
     const { t } = useTranslation();
     const recording = useAudioRecording(busId);
@@ -373,49 +374,6 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         };
     }, [isLiveRecording, label, recording, t]);
 
-    const freqYMax = React.useMemo(() => {
-        if (!fftFrame || fftFrame.magnitudes.length === 0) return 1;
-        let frameMax = 0;
-        for (let i = 0; i < fftFrame.magnitudes.length; i++) {
-            if (fftFrame.magnitudes[i] > frameMax) frameMax = fftFrame.magnitudes[i];
-        }
-        const peak = fftPeak && fftPeak > 0 ? fftPeak : frameMax > 0 ? frameMax : 1;
-        return peak * 1.1;
-    }, [fftFrame, fftPeak]);
-
-    const freqData = React.useMemo<ChartDataProps | undefined>(() => {
-        if (!fftFrame || fftFrame.magnitudes.length === 0) return undefined;
-        const step = Math.max(1, Math.ceil(fftFrame.magnitudes.length / MAX_POINTS));
-        const pts: Point[] = [];
-        const colors: string[] = [];
-        const nyquist = fftFrame.sampleRate / 2;
-        for (let i = 0; i < fftFrame.magnitudes.length; i += step) {
-            const freq = fftFrame.frequencies[i];
-            const y = fftFrame.magnitudes[i];
-            pts.push({ x: freq, y });
-            const hue = Math.max(0, Math.min(120, (freq / nyquist) * 120));
-            colors.push(`hsl(${hue}, 90%, 55%)`);
-        }
-        const lastIdx = fftFrame.magnitudes.length - 1;
-        if (pts.length === 0 || pts[pts.length - 1].x < fftFrame.frequencies[lastIdx]) {
-            pts.push({ x: fftFrame.frequencies[lastIdx], y: fftFrame.magnitudes[lastIdx] });
-            const hue = Math.max(0, Math.min(120, (fftFrame.frequencies[lastIdx] / nyquist) * 120));
-            colors.push(`hsl(${hue}, 90%, 55%)`);
-        }
-        return {
-            datasets: [
-                {
-                    label: label ?? t("experiments.audioAnalysis.components.graph.fftDataset", "FFT"),
-                    data: pts,
-                    type: "bar",
-                    backgroundColor: colors,
-                    borderWidth: 0,
-                    pointRadius: 0,
-                    showLine: false,
-                },
-            ],
-        };
-    }, [fftFrame, label, t]);
 
     const durationSec = React.useMemo(() => {
         if (isLiveRecording || !recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
@@ -631,6 +589,61 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         },
     }), [autoTooltip, durationSec, onZoomComplete, t, timeYDomain, zoomWindow]);
 
+    const freqYMax = React.useMemo(() => {
+        if (!fftFrame || fftFrame.magnitudes.length === 0) return 1;
+        let frameMax = 0;
+        for (let i = 0; i < fftFrame.magnitudes.length; i++) {
+            if (fftFrame.magnitudes[i] > frameMax) frameMax = fftFrame.magnitudes[i];
+        }
+        const peak = fftPeak && fftPeak > 0 ? fftPeak : frameMax > 0 ? frameMax : 1;
+        return peak * 1.1;
+    }, [fftFrame, fftPeak]);
+
+    const maxFreq = React.useMemo(() => {
+        if (!fftFrame || fftFrame.magnitudes.length === 0) return FFT_DISPLAY_MAX_HZ;
+        let frameMax = 0;
+        for (let i = 0; i < fftFrame.magnitudes.length; i++) {
+            if (fftFrame.magnitudes[i] > frameMax) frameMax = fftFrame.magnitudes[i];
+        }
+        const threshold = Math.max(1e-10, frameMax * 0.001);
+        for (let i = fftFrame.magnitudes.length - 1; i >= 0; i--) {
+            if (fftFrame.magnitudes[i] > threshold) {
+                return Math.min(FFT_DISPLAY_MAX_HZ, Math.ceil(fftFrame.frequencies[i]));
+            }
+        }
+        return FFT_DISPLAY_MAX_HZ;
+    }, [fftFrame]);
+
+    const freqData = React.useMemo<ChartDataProps | undefined>(() => {
+        if (!fftFrame || fftFrame.magnitudes.length === 0) return undefined;
+        const step = Math.max(1, Math.ceil(fftFrame.magnitudes.length / MAX_POINTS));
+        const nyquist = fftFrame.sampleRate / 2;
+        const pts: Point[] = [];
+        const colors: string[] = [];
+        for (let i = 0; i < fftFrame.magnitudes.length; i += step) {
+            const freq = fftFrame.frequencies[i];
+            if (freq > maxFreq) break;
+            pts.push({ x: freq, y: fftFrame.magnitudes[i] });
+            const hue = Math.max(0, Math.min(120, (freq / Math.min(nyquist, maxFreq)) * 120));
+            colors.push(`hsl(${hue}, 90%, 55%)`);
+        }
+        return {
+            datasets: [
+                {
+                    label: label ?? t("experiments.audioAnalysis.components.graph.fftDataset", "FFT"),
+                    data: pts,
+                    type: "bar",
+                    backgroundColor: colors,
+                    borderWidth: 0,
+                    pointRadius: 0,
+                    showLine: false,
+                    barPercentage: 1,
+                    categoryPercentage: 1,
+                },
+            ],
+        };
+    }, [fftFrame, maxFreq, label, t]);
+
     const freqOptions = React.useMemo<ChartOptions<"bar" | "line">>(() => ({
         animation: false,
         plugins: { legend: { display: false } },
@@ -639,7 +652,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 type: "linear",
                 title: { display: true, text: t("experiments.audioAnalysis.components.graph.freqAxis", "Frequency (Hz)") },
                 min: 0,
-                max: FFT_DISPLAY_MAX_HZ,
+                max: maxFreq,
                 offset: false,
             },
             y: {
@@ -649,7 +662,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 max: freqYMax,
             },
         },
-    }), [freqYMax, t]);
+    }), [freqYMax, maxFreq, t]);
 
     const activeData = graphView === "time" ? timeData : freqData;
     const activeOptions = graphView === "time" ? timeOptions : freqOptions;

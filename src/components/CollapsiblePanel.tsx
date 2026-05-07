@@ -29,26 +29,26 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
     const [urlSecond, setUrlSecond] = React.useState<string>("");
 
     React.useEffect(() => {
-        if (urlMain) URL.revokeObjectURL(urlMain);
-        if (recordingMain?.blob) {
-            setUrlMain(URL.createObjectURL(recordingMain.blob));
-        } else {
+        if (!recordingMain?.blob) {
             setUrlMain("");
+            return;
         }
+        const url = URL.createObjectURL(recordingMain.blob);
+        setUrlMain(url);
         return () => {
-            if (urlMain) URL.revokeObjectURL(urlMain);
+            URL.revokeObjectURL(url);
         };
     }, [recordingMain?.blob]);
 
     React.useEffect(() => {
-        if (urlSecond) URL.revokeObjectURL(urlSecond);
-        if (recordingSecond?.blob) {
-            setUrlSecond(URL.createObjectURL(recordingSecond.blob));
-        } else {
+        if (!recordingSecond?.blob) {
             setUrlSecond("");
+            return;
         }
+        const url = URL.createObjectURL(recordingSecond.blob);
+        setUrlSecond(url);
         return () => {
-            if (urlSecond) URL.revokeObjectURL(urlSecond);
+            URL.revokeObjectURL(url);
         };
     }, [recordingSecond?.blob]);
 

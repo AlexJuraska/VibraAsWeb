@@ -1,0 +1,87 @@
+{
+  "layout": "SlideLayout",
+  "zones": {
+    "CollapsiblePanel": {
+      "component": "CollapsiblePanel",
+      "props": {
+        "collapsed": true,
+        "children": [
+          { "component": "AudioInputDeviceSelector", "props": {} },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AutoSweepRecordButton", "props": { "busId": "main" } },
+          { "component": "AudioFileUploader", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          {
+            "component": "HomeButton",
+            "props": {
+              "to": "/",
+              "color": "primary"
+            }
+          }
+        ]
+      }
+    },
+    "topGraph": {
+      "component": "AudioRecordingGraph",
+      "props": { "busId": "main", "label": "Waveform", "mode": "time" },
+      "slideable": true,
+      "slideLabel": "Top Graph",
+      "slideDirection": "top",
+      "slideGroup": "topBottom",
+      "defaultOpen": true
+    },
+    "bottomGraph": {
+      "component": "AudioRecordingGraph",
+      "props": { "busId": "main", "label": "FFT", "mode": "freq" },
+      "slideable": true,
+      "slideLabel": "FFT Graph",
+      "slideDirection": "bottom",
+      "slideGroup": "topBottom",
+      "defaultOpen": true
+    },
+    "leftPanel": {
+      "component": "LayoutControlPanel",
+      "props": {
+        "busId": "main",
+        "children": [
+          { "component": "AudioInputDeviceSelector", "props": {} },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AutoSweepRecordButton", "props": { "busId": "main" } },
+          { "component": "AudioFileUploader", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioPlayer", "props": { "busId": "main" } }
+        ]
+      }
+    },
+    "homeButton": {
+      "component": "HomeButton",
+      "props": {
+        "to": "/",
+        "color": "primary"
+      }
+    }
+  },
+  "grid": {
+    "xs": {
+      "areas": [
+        ["CollapsiblePanel"],
+        ["topGraph"],
+        ["bottomGraph"]
+      ],
+      "columns": ["1fr"],
+      "rows": ["60px", "1fr", "1fr"]
+    },
+    "xl": {
+      "areas": [
+        ["leftPanel", "topGraph"],
+        ["leftPanel", "bottomGraph"],
+        ["homeButton", "bottomGraph"]
+      ],
+      "columns": ["2fr", "8fr"],
+      "rows": ["1fr", "1fr", "80px"]
+    }
+  }
+}
+

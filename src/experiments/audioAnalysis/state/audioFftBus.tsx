@@ -23,6 +23,7 @@ const lastFrameState = new Map<string, { lastTime: number; lastTs: number }>();
 const EPS = 1e-12;
 const DEFAULT_FFT_SIZE = 2048;
 const PLAYBACK_FPS_MS = 33;
+const PEAK_TARGET_FRAMES = 200;
 
 const fftInstances = new Map<number, FFT>();
 function getFft(size: number): FFT {
@@ -44,7 +45,7 @@ function publish(frame: AudioFftFrame | undefined, busId = "main") {
     getListeners(busId).forEach((l) => l(frame, peaks.get(busId)));
 }
 
-function computeFftAtTime(rec: AudioRecording, timeSec = 0, fftSize = 2048): AudioFftFrame | undefined {
+function computeFftAtTime(rec: AudioRecording, timeSec = 0, fftSize = DEFAULT_FFT_SIZE): AudioFftFrame | undefined {
     if (!rec.samples || rec.samples.length === 0 || rec.sampleRate <= 0) return undefined;
 
     const size = Math.max(2, nextPowerOfTwo(Math.min(rec.samples.length, fftSize)));
@@ -154,7 +155,9 @@ function computeFftPeak(rec: AudioRecording, fftSize = DEFAULT_FFT_SIZE, hop = f
     const spectrum = fft.createComplexArray();
     const buffer = new Float32Array(size);
     let max = 0;
-    for (let start = 0; start < rec.samples.length; start += hop) {
+    const minHop = Math.max(1, hop);
+    const targetHop = Math.max(minHop, Math.floor(rec.samples.length / PEAK_TARGET_FRAMES));
+    for (let start = 0; start < rec.samples.length; start += targetHop) {
         buffer.fill(0);
         const available = Math.min(size, rec.samples.length - start);
         if (available > 0) buffer.set(rec.samples.subarray(start, start + available));

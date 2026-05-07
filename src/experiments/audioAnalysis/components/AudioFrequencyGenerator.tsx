@@ -19,6 +19,7 @@ const AudioFrequencyGenerator: React.FC = () => {
     const { t } = useTranslation();
 
     const [frequency, setFrequency] = React.useState(DEFAULT_FREQ);
+    const [inputValue, setInputValue] = React.useState(String(DEFAULT_FREQ));
     const [running, setRunning] = React.useState(false);
     const [sinkId, setSinkId] = React.useState(
         () => localStorage.getItem(STORAGE_KEY) ?? "default",
@@ -155,6 +156,7 @@ const AudioFrequencyGenerator: React.FC = () => {
         const next = clampFreq(v);
         freqRef.current = next;
         setFrequency(next);
+        setInputValue(String(Math.round(next)));
         scheduleFreq();
     };
 
@@ -195,10 +197,22 @@ const AudioFrequencyGenerator: React.FC = () => {
                         label={t("experiments.audioAnalysis.components.frequencyGenerator.frequency", "Frequency")}
                         type="number"
                         size="small"
-                        value={Math.round(frequency)}
+                        value={inputValue}
                         onChange={(e) => {
+                            setInputValue(e.target.value);
                             const v = Number(e.target.value);
-                            if (Number.isFinite(v)) handleFreqChange(v);
+                            if (Number.isFinite(v) && v >= MIN_FREQ && v <= MAX_FREQ) {
+                                freqRef.current = v;
+                                scheduleFreq();
+                            }
+                        }}
+                        onBlur={(e) => {
+                            const v = Number(e.target.value);
+                            const next = Number.isFinite(v) && v > 0 ? clampFreq(v) : frequency;
+                            freqRef.current = next;
+                            setFrequency(next);
+                            setInputValue(String(Math.round(next)));
+                            scheduleFreq();
                         }}
                         slotProps={{
                             input: {

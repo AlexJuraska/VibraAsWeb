@@ -4,6 +4,7 @@
     "choose_experiment": "Choose an experiment to explore",
     "experiment_chladni": "Chladni's Patterns",
     "experiment_audio_analysis": "Audio Analysis",
+    "experiment_automatic_audio_analysis": "Automatic Audio Analysis",
     "experiment_laser": "Laser Vibrometer",
     "experiment_graph": "Graph Test"
   },
@@ -92,6 +93,19 @@
           "stop": "Stop Sound"
         }
 
+      }
+    },
+    "automaticAudioAnalysis": {
+      "components": {
+        "autoSweep": {
+          "title": "Auto Sweep Recording",
+          "startFrequency": "Start Frequency",
+          "endFrequency": "End Frequency",
+          "duration": "Duration",
+          "start": "Record Sweep",
+          "stop": "Stop Recording",
+          "invalidRange": "Invalid sweep settings."
+        }
       }
     }
   }

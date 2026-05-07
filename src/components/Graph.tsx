@@ -32,6 +32,8 @@ export type Dataset = {
     backgroundColor?: string | string[];
     borderColor?: string | string[];
     borderWidth?: number;
+    barPercentage?: number;
+    categoryPercentage?: number;
 };
 
 export type ChartDataProps = {

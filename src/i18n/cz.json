@@ -4,6 +4,7 @@
     "choose_experiment": "Vyberte experiment na prozkoumání",
     "experiment_chladni": "Chladniho vzorce",
     "experiment_audio_analysis": "Audio analýza",
+    "experiment_automatic_audio_analysis": "Automatická audio analýza",
     "experiment_laser": "Laser Vibrometer",
     "experiment_graph": "Graph Test"
   },
@@ -90,6 +91,19 @@
           "frequency": "Frekvence",
           "start": "Pustit zvuk",
           "stop": "Zastavit zvuk"
+        }
+      }
+    },
+    "automaticAudioAnalysis": {
+      "components": {
+        "autoSweep": {
+          "title": "Automatický sweep záznam",
+          "startFrequency": "Počáteční frekvence",
+          "endFrequency": "Konečná frekvence",
+          "duration": "Doba trvání",
+          "start": "Nahrát sweep",
+          "stop": "Zastavit nahrávání",
+          "invalidRange": "Neplatné nastavení sweepu."
         }
       }
     }
