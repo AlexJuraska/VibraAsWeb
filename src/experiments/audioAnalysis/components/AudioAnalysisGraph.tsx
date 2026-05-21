@@ -1,5 +1,5 @@
 import React from "react";
-import { Stack, ButtonGroup, Button, Checkbox, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Slider, IconButton } from "@mui/material";
+import { Stack, ButtonGroup, Button, Checkbox, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Slider, IconButton, Box } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { Theme } from "@mui/material/styles";
 import ArrowLeftIcon from "@mui/icons-material/ArrowLeft";
@@ -11,10 +11,20 @@ import { audioRecordingBus, useAudioRecording } from "../state/audioRecordingBus
 import { audioPlaybackBus, useAudioPlayback } from "../state/audioPlaybackBus";
 import { useTranslation } from "../../../i18n/i18n";
 import { useAudioFft, useAudioFftPeak } from "../state/audioFftBus";
+import { useAudioStft, deriveMaxFrequency, type AudioStftFrame } from "../state/audioStftBus";
 import { encodeWav } from "../../../utils/encodeWav";
 
 const MAX_POINTS = 15000;
-const FFT_DISPLAY_MAX_HZ = 20000;
+
+// ─── Live-waveform performance knobs ──────────────────────────────────────────
+// MAX_DISPLAY_SECONDS_FOR_LIVE  – rolling sample window shown during recording.
+// LIVE_COARSE_FACTOR            – stride multiplier; caps loop iterations to
+//                                 chartW × factor (3–5 is ideal).
+// MIN_DRAW_MS_LIVE              – minimum ms between canvas redraws (~30 FPS).
+const MAX_DISPLAY_SECONDS_FOR_LIVE = 8;
+const LIVE_COARSE_FACTOR = 4;
+const MIN_DRAW_MS_LIVE = 33;
+const BAR_HZ = 10;
 
 type ViewMode = "time" | "freq";
 type InteractionMode = "zoom" | "cut";
@@ -42,11 +52,37 @@ const PAD_RIGHT = 12;
 const PAD_TOP = 8;
 const PAD_BOTTOM = 40;
 
+/*
+ * drawLiveWaveform — canvas renderer for the live-recording waveform.
+ *
+ * Performance strategy
+ * ────────────────────
+ * Rendering a raw 44.1 kHz buffer pixel-by-pixel inside an RAF loop causes
+ * visible jank within the first few seconds of recording. Three techniques
+ * keep it constant-cost regardless of how long the recording has been running:
+ *
+ *  1. Rolling window  – Only the last MAX_DISPLAY_SECONDS_FOR_LIVE seconds of
+ *                       samples are fed to each draw call, bounding input size.
+ *
+ *  2. Coarse stride   – A stride of ceil(N / (chartW × LIVE_COARSE_FACTOR)) caps
+ *                       examined samples to chartW × LIVE_COARSE_FACTOR, keeping
+ *                       both the y-bounds scan and the bucket-aggregation loop
+ *                       O(chartW) regardless of recording duration.
+ *
+ *  3. Single polygon  – One closed path (maxima left→right, minima right→left)
+ *                       followed by a single fill() + stroke() replaces N separate
+ *                       per-pixel stroke calls, minimising Canvas 2D state changes.
+ *
+ * topPtsRef / botPtsRef are reused Float64Arrays (reallocated only when chartW
+ * changes), avoiding GC pressure inside the RAF loop.
+ */
 function drawLiveWaveform(
     canvas: HTMLCanvasElement,
     samples: Float32Array,
     sampleRate: number,
     yBoundsRef: { current: { min: number; max: number } | null },
+    topPtsRef: { current: Float64Array | null },
+    botPtsRef: { current: Float64Array | null },
     theme: Theme,
     xLabel: string,
     yLabel: string,
@@ -71,10 +107,20 @@ function drawLiveWaveform(
     const chartW = Math.max(1, cssW - PAD_LEFT - PAD_RIGHT);
     const chartH = Math.max(1, cssH - PAD_TOP - PAD_BOTTOM);
 
+    // Window to the most recent MAX_DISPLAY_SECONDS_FOR_LIVE seconds of samples.
+    const maxDisplaySamples = Math.floor(MAX_DISPLAY_SECONDS_FOR_LIVE * sampleRate);
+    const startIdx = Math.max(0, samples.length - maxDisplaySamples);
+    const displaySamples = samples.subarray(startIdx);
+    const duration = displaySamples.length / sampleRate;
+
+    // LIVE_COARSE_FACTOR caps total loop iterations to chartW × LIVE_COARSE_FACTOR,
+    // keeping per-frame CPU cost constant regardless of how many samples have accumulated.
+    const stride = Math.max(1, Math.ceil(displaySamples.length / (chartW * LIVE_COARSE_FACTOR)));
+
     let yMin = Infinity;
     let yMax = -Infinity;
-    for (let i = 0; i < samples.length; i++) {
-        const v = samples[i];
+    for (let i = 0; i < displaySamples.length; i += stride) {
+        const v = displaySamples[i];
         if (v < yMin) yMin = v;
         if (v > yMax) yMax = v;
     }
@@ -84,8 +130,12 @@ function drawLiveWaveform(
     if (!prev) {
         yBoundsRef.current = { min: yMin, max: yMax };
     } else {
-        if (yMin < prev.min) prev.min = yMin;
-        if (yMax > prev.max) prev.max = yMax;
+        // Only expand stored bounds when the new extreme falls outside the current
+        // bounds plus a 10% guard, reducing axis churn on small amplitude changes.
+        const range = Math.max(prev.max - prev.min, 0.01);
+        const pad = range * 0.1;
+        if (yMin < prev.min - pad) prev.min = yMin;
+        if (yMax > prev.max + pad) prev.max = yMax;
     }
     yMin = yBoundsRef.current!.min;
     yMax = yBoundsRef.current!.max;
@@ -94,8 +144,6 @@ function drawLiveWaveform(
     const yPad = Math.max((yMax - yMin) * 0.1, 0.05);
     yMin -= yPad;
     yMax += yPad;
-
-    const duration = samples.length / sampleRate;
 
     const toX = (t: number) => chartL + (t / duration) * chartW;
     const toY = (v: number) => chartT + (1 - (v - yMin) / (yMax - yMin)) * chartH;
@@ -141,22 +189,29 @@ function drawLiveWaveform(
     ctx.rect(chartL, chartT, chartW, chartH);
     ctx.clip();
 
-    const topPts = new Float64Array(chartW);
-    const botPts = new Float64Array(chartW);
+    // Reuse pre-allocated pixel buffers; reallocate only when chartW changes.
+    if (!topPtsRef.current || topPtsRef.current.length !== chartW) {
+        topPtsRef.current = new Float64Array(chartW);
+    }
+    if (!botPtsRef.current || botPtsRef.current.length !== chartW) {
+        botPtsRef.current = new Float64Array(chartW);
+    }
+    const topPts = topPtsRef.current;
+    const botPts = botPtsRef.current;
+
+    // Bucket aggregation: single O(N) pass — each sample lands in exactly one pixel column.
+    topPts.fill(0); // amplitude hi per pixel (starts at 0 = center)
+    botPts.fill(0); // amplitude lo per pixel (starts at 0 = center)
+    for (let i = 0; i < displaySamples.length; i += stride) {
+        const px = Math.min(chartW - 1, Math.floor((i / displaySamples.length) * chartW));
+        const v = displaySamples[i];
+        if (v > topPts[px]) topPts[px] = v;
+        if (v < botPts[px]) botPts[px] = v;
+    }
+    // Convert amplitude values to canvas Y coordinates in place.
     for (let px = 0; px < chartW; px++) {
-        const tS = (px / chartW) * duration;
-        const tE = ((px + 1) / chartW) * duration;
-        const iS = Math.floor(tS * sampleRate);
-        const iE = Math.min(samples.length - 1, Math.ceil(tE * sampleRate));
-        let lo = 0;
-        let hi = 0;
-        for (let i = iS; i <= iE; i++) {
-            const v = samples[i];
-            if (v < lo) lo = v;
-            if (v > hi) hi = v;
-        }
-        topPts[px] = toY(hi);
-        botPts[px] = toY(lo);
+        topPts[px] = toY(topPts[px]);
+        botPts[px] = toY(botPts[px]);
     }
 
     ctx.beginPath();
@@ -166,17 +221,8 @@ function drawLiveWaveform(
     ctx.closePath();
     ctx.fillStyle = WAVEFORM_FILL;
     ctx.fill();
-
     ctx.strokeStyle = WAVEFORM_COLOR;
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(chartL, topPts[0]);
-    for (let px = 1; px < chartW; px++) ctx.lineTo(chartL + px, topPts[px]);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(chartL, botPts[0]);
-    for (let px = 1; px < chartW; px++) ctx.lineTo(chartL + px, botPts[px]);
     ctx.stroke();
 
     ctx.restore();
@@ -205,6 +251,8 @@ const LiveWaveformCanvas: React.FC<{
     const theme = useTheme<Theme>();
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     const yBoundsRef = React.useRef<{ min: number; max: number } | null>(null);
+    const topPtsRef = React.useRef<Float64Array | null>(null);
+    const botPtsRef = React.useRef<Float64Array | null>(null);
     const pendingRef = React.useRef<{ samples: Float32Array; sampleRate: number } | null>(null);
     const dirtyRef = React.useRef(false);
     const drawParamsRef = React.useRef({ theme, xLabel, yLabel });
@@ -215,6 +263,8 @@ const LiveWaveformCanvas: React.FC<{
 
     React.useEffect(() => {
         yBoundsRef.current = null;
+        topPtsRef.current = null;
+        botPtsRef.current = null;
         pendingRef.current = null;
         dirtyRef.current = false;
 
@@ -226,15 +276,17 @@ const LiveWaveformCanvas: React.FC<{
         }, busId);
 
         let rafId: number;
-        const loop = () => {
-            if (dirtyRef.current) {
+        let lastDrawTs = 0;
+        const loop = (now: number) => {
+            if (dirtyRef.current && now - lastDrawTs >= MIN_DRAW_MS_LIVE) {
                 dirtyRef.current = false;
+                lastDrawTs = now;
                 const canvas = canvasRef.current;
                 if (canvas) {
                     const data = pendingRef.current;
                     if (data) {
                         const { theme: t, xLabel: xl, yLabel: yl } = drawParamsRef.current;
-                        drawLiveWaveform(canvas, data.samples, data.sampleRate, yBoundsRef, t, xl, yl);
+                        drawLiveWaveform(canvas, data.samples, data.sampleRate, yBoundsRef, topPtsRef, botPtsRef, t, xl, yl);
                     } else {
                         const ctx = canvas.getContext("2d");
                         ctx?.clearRect(0, 0, canvas.width, canvas.height);
@@ -260,12 +312,203 @@ const LiveWaveformCanvas: React.FC<{
 
 
 
+function getStftMagnitudesAtTime(stftFrame: AudioStftFrame, timeSec: number): Float32Array {
+    const { timeBins, stftMatrix, frameSize } = stftFrame;
+    const bins = frameSize / 2;
+    let lo = 0;
+    let hi = timeBins.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (timeBins[mid] < timeSec) lo = mid + 1; else hi = mid;
+    }
+    if (lo > 0 && Math.abs(timeBins[lo - 1] - timeSec) < Math.abs(timeBins[lo] - timeSec)) lo--;
+    const magnitudes = new Float32Array(bins + 1);
+    for (let b = 0; b <= bins; b++) {
+        magnitudes[b] = stftMatrix.get(b)?.[lo] ?? 1e-12;
+    }
+    return magnitudes;
+}
+
+// HSL → RGB helper and pre-built color lookup table (computed once at module load).
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number) => {
+        const k = (n + h * 12) % 12;
+        return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    };
+    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+}
+
+const SPECTROGRAM_COLORS = (() => {
+    const table = new Uint8ClampedArray(256 * 3);
+    for (let i = 0; i < 256; i++) {
+        const intensity = i / 255;
+        // intensity=0 → lightness 90% (pale), intensity=1 → lightness 10% (near-black)
+        const [r, g, b] = hslToRgb(25 / 360, 0.9, (90 - 80 * intensity) / 100);
+        table[i * 3] = r; table[i * 3 + 1] = g; table[i * 3 + 2] = b;
+    }
+    return table;
+})();
+
+
+const StftHeatmapCanvas: React.FC<{
+    stftFrame: AudioStftFrame;
+    duration: number;
+    currentTime: number;
+    onSeek: (t: number) => void;
+    viewStart: number;
+    viewEnd: number;
+    cutSelection: { start: number; end: number } | null;
+}> = ({ stftFrame, duration, currentTime, onSeek, viewStart, viewEnd, cutSelection }) => {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    // Pre-rendered full spectrogram; zoomed view is a cheap drawImage crop.
+    const offscreenRef = React.useRef<HTMLCanvasElement | null>(null);
+
+    const currentTimeRef = React.useRef(currentTime);
+    const durationRef = React.useRef(duration);
+    const viewStartRef = React.useRef(viewStart);
+    const viewEndRef = React.useRef(viewEnd);
+    const cutRef = React.useRef(cutSelection);
+
+    React.useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+    React.useEffect(() => { durationRef.current = duration; }, [duration]);
+    React.useEffect(() => { viewStartRef.current = viewStart; }, [viewStart]);
+    React.useEffect(() => { viewEndRef.current = viewEnd; }, [viewEnd]);
+    React.useEffect(() => { cutRef.current = cutSelection; }, [cutSelection]);
+
+    const draw = React.useCallback(() => {
+        const canvas = canvasRef.current;
+        const offCanvas = offscreenRef.current;
+        if (!canvas || !offCanvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        const cssW = canvas.clientWidth;
+        const cssH = canvas.clientHeight;
+        if (cssW === 0 || cssH === 0) return;
+        if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
+            canvas.width = Math.round(cssW * dpr);
+            canvas.height = Math.round(cssH * dpr);
+        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const vs = viewStartRef.current;
+        const ve = viewEndRef.current;
+        const dur = durationRef.current;
+        const viewDuration = ve - vs;
+        if (viewDuration <= 0 || dur <= 0) return;
+
+        // Crop the pre-rendered offscreen image to the current view window.
+        const srcX = (vs / dur) * offCanvas.width;
+        const srcW = Math.max(1, (viewDuration / dur) * offCanvas.width);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(offCanvas, srcX, 0, srcW, offCanvas.height, 0, 0, cssW, cssH);
+
+        const toX = (t: number) => ((t - vs) / viewDuration) * cssW;
+
+        // Dim regions outside the cut selection and draw an amber border.
+        const cut = cutRef.current;
+        if (cut) {
+            const cutX0 = Math.max(0, toX(cut.start));
+            const cutX1 = Math.min(cssW, toX(cut.end));
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            if (cutX0 > 0) ctx.fillRect(0, 0, cutX0, cssH);
+            if (cutX1 < cssW) ctx.fillRect(cutX1, 0, cssW - cutX1, cssH);
+            ctx.strokeStyle = "rgba(255,165,0,0.9)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cutX0 + 1, 1, Math.max(0, cutX1 - cutX0 - 2), cssH - 2);
+        }
+
+        // Playhead
+        const px = toX(currentTimeRef.current);
+        if (px >= 0 && px <= cssW) {
+            ctx.strokeStyle = "rgba(220,0,0,0.9)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(px, 0);
+            ctx.lineTo(px, cssH);
+            ctx.stroke();
+        }
+    }, []);
+
+    // Build the full offscreen heatmap once per recording.
+    // One pixel per frame: color = max amplitude in that frame, normalized to global max.
+    React.useEffect(() => {
+        const { stftMatrix, timeBins } = stftFrame;
+        const numFrames = timeBins.length;
+
+        const frameMaxes = new Float32Array(numFrames);
+        let gmax = 0;
+        for (const arr of stftMatrix.values()) {
+            for (let frameIdx = 0; frameIdx < arr.length; frameIdx++) {
+                if (arr[frameIdx] > frameMaxes[frameIdx]) frameMaxes[frameIdx] = arr[frameIdx];
+            }
+        }
+        for (let i = 0; i < numFrames; i++) {
+            if (frameMaxes[i] > gmax) gmax = frameMaxes[i];
+        }
+
+        const offCanvas = document.createElement("canvas");
+        offCanvas.width = numFrames;
+        offCanvas.height = 1;
+        const offCtx = offCanvas.getContext("2d");
+        if (!offCtx) return;
+
+        const imgData = offCtx.createImageData(numFrames, 1);
+        const data = imgData.data;
+
+        for (let frameIdx = 0; frameIdx < numFrames; frameIdx++) {
+            const level = gmax > 0 ? Math.min(255, Math.round((frameMaxes[frameIdx] / gmax) * 255)) : 0;
+            const ci = level * 3;
+            const idx = frameIdx * 4;
+            data[idx] = SPECTROGRAM_COLORS[ci];
+            data[idx + 1] = SPECTROGRAM_COLORS[ci + 1];
+            data[idx + 2] = SPECTROGRAM_COLORS[ci + 2];
+            data[idx + 3] = 255;
+        }
+
+        offCtx.putImageData(imgData, 0, 0);
+        offscreenRef.current = offCanvas;
+        draw();
+    }, [stftFrame, draw]);
+
+    React.useEffect(() => { draw(); }, [draw, viewStart, viewEnd, currentTime, cutSelection]);
+
+    React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const observer = new ResizeObserver(() => draw());
+        observer.observe(canvas);
+        return () => observer.disconnect();
+    }, [draw]);
+
+    const handleClick = React.useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const xRel = (e.clientX - rect.left) / rect.width;
+        const clicked = viewStartRef.current + xRel * (viewEndRef.current - viewStartRef.current);
+        onSeek(Math.max(0, Math.min(durationRef.current, clicked)));
+    }, [onSeek]);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            onClick={handleClick}
+            title="Spectrogram — click to navigate"
+            style={{ width: "100%", height: "100%", display: "block", cursor: "pointer" }}
+        />
+    );
+};
+
 const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: ViewMode; initialView?: ViewMode; enableToggle?: boolean }> = ({ busId = "main", label, mode, initialView = "time", enableToggle = false }) => {
     const { t } = useTranslation();
     const recording = useAudioRecording(busId);
     const playback = useAudioPlayback(busId);
     const fftFrame = useAudioFft(busId);
     const fftPeak = useAudioFftPeak(busId);
+    const stftFrame = useAudioStft(busId);
 
     const [viewState, setViewState] = React.useState<ViewMode>(initialView);
     const [interactionMode, setInteractionMode] = React.useState<InteractionMode>("zoom");
@@ -276,6 +519,8 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     const playheadTimeRef = React.useRef<number | null>(null);
     const zoomSyncRef = React.useRef<string>("");
     const suppressCutRef = React.useRef(false);
+    const stftFrameRef = React.useRef<AudioStftFrame | undefined>(undefined);
+    const maxFreqRef = React.useRef<number>(10000);
 
     const graphView: ViewMode = enableToggle ? viewState : mode ?? "time";
     const isLiveRecording = !!recording && !recording.blob;
@@ -379,6 +624,11 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         if (isLiveRecording || !recording || recording.samples.length === 0 || recording.sampleRate <= 0) return undefined;
         return recording.samples.length / recording.sampleRate;
     }, [isLiveRecording, recording]);
+
+    const handleSeek = React.useCallback((timeSec: number) => {
+        const dur = durationSec ?? 0;
+        audioPlaybackBus.publish({ currentTime: Math.max(0, Math.min(dur, timeSec)), duration: dur, playing: false }, busId);
+    }, [busId, durationSec]);
 
     const syncZoomWindow = React.useCallback((chart: any) => {
         if (!chart || !durationSec || graphView !== "time") {
@@ -600,31 +850,49 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     }, [fftFrame, fftPeak]);
 
     const maxFreq = React.useMemo(() => {
-        if (!fftFrame || fftFrame.magnitudes.length === 0) return FFT_DISPLAY_MAX_HZ;
-        let frameMax = 0;
-        for (let i = 0; i < fftFrame.magnitudes.length; i++) {
-            if (fftFrame.magnitudes[i] > frameMax) frameMax = fftFrame.magnitudes[i];
+        if (stftFrame) {
+            const derived = deriveMaxFrequency(stftFrame);
+            if (derived != null && derived > 0) return derived * 1.05;
         }
-        const threshold = Math.max(1e-10, frameMax * 0.001);
-        for (let i = fftFrame.magnitudes.length - 1; i >= 0; i--) {
-            if (fftFrame.magnitudes[i] > threshold) {
-                return Math.min(FFT_DISPLAY_MAX_HZ, Math.ceil(fftFrame.frequencies[i]));
-            }
-        }
-        return FFT_DISPLAY_MAX_HZ;
-    }, [fftFrame]);
+        return 10000;
+    }, [stftFrame]);
+
+    stftFrameRef.current = stftFrame;
+    maxFreqRef.current = maxFreq;
 
     const freqData = React.useMemo<ChartDataProps | undefined>(() => {
-        if (!fftFrame || fftFrame.magnitudes.length === 0) return undefined;
-        const step = Math.max(1, Math.ceil(fftFrame.magnitudes.length / MAX_POINTS));
-        const nyquist = fftFrame.sampleRate / 2;
+        let magnitudes: Float32Array | undefined;
+        let frequencies: Float32Array | undefined;
+        let sampleRate = 44100;
+
+        if (stftFrame) {
+            magnitudes = getStftMagnitudesAtTime(stftFrame, stftFrame.timeBins[0] ?? 0);
+            frequencies = stftFrame.frequencies;
+            sampleRate = stftFrame.sampleRate;
+        } else if (fftFrame) {
+            magnitudes = fftFrame.magnitudes;
+            frequencies = fftFrame.frequencies;
+            sampleRate = fftFrame.sampleRate;
+        }
+
+        if (!magnitudes || !frequencies || magnitudes.length === 0) return undefined;
+        const nyquist = sampleRate / 2;
+        const binHz = frequencies.length > 1 ? frequencies[1] : 1;
+        const numBars = Math.floor(maxFreq / BAR_HZ);
         const pts: Point[] = [];
         const colors: string[] = [];
-        for (let i = 0; i < fftFrame.magnitudes.length; i += step) {
-            const freq = fftFrame.frequencies[i];
-            if (freq > maxFreq) break;
-            pts.push({ x: freq, y: fftFrame.magnitudes[i] });
-            const hue = Math.max(0, Math.min(120, (freq / Math.min(nyquist, maxFreq)) * 120));
+        for (let bar = 0; bar < numBars; bar++) {
+            const freqStart = bar * BAR_HZ;
+            const iStart = Math.max(0, Math.round(freqStart / binHz));
+            const iEnd = Math.min(magnitudes.length - 1, Math.max(iStart, Math.round((freqStart + BAR_HZ) / binHz) - 1));
+            if (iStart >= magnitudes.length) break;
+            let maxMag = 0;
+            for (let i = iStart; i <= iEnd; i++) {
+                if (magnitudes[i] > maxMag) maxMag = magnitudes[i];
+            }
+            const centerFreq = freqStart + BAR_HZ / 2;
+            pts.push({ x: centerFreq, y: maxMag });
+            const hue = Math.max(0, Math.min(120, (centerFreq / Math.min(nyquist, maxFreq)) * 120));
             colors.push(`hsl(${hue}, 90%, 55%)`);
         }
         return {
@@ -642,11 +910,68 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 },
             ],
         };
-    }, [fftFrame, maxFreq, label, t]);
+    }, [stftFrame, fftFrame, maxFreq, label, t]);
+
+    React.useEffect(() => {
+        if (graphView !== "freq") return;
+        let rafHandle: number | null = null;
+        let pendingTime = 0;
+        const unsub = audioPlaybackBus.subscribe((pb) => {
+            pendingTime = pb?.currentTime ?? 0;
+            if (rafHandle !== null) return; // already a frame queued — it will use the latest pendingTime
+            rafHandle = requestAnimationFrame(() => {
+                rafHandle = null;
+                const chart = chartRef.current;
+                const sf = stftFrameRef.current;
+                if (!chart?.data?.datasets?.[0] || !sf) return;
+                const magnitudes = getStftMagnitudesAtTime(sf, pendingTime);
+                const { frequencies } = sf;
+                const binHz = frequencies.length > 1 ? frequencies[1] : 1;
+                const mf = maxFreqRef.current;
+                const numBars = Math.floor(mf / BAR_HZ);
+                const pts: Point[] = [];
+                for (let bar = 0; bar < numBars; bar++) {
+                    const freqStart = bar * BAR_HZ;
+                    const iStart = Math.max(0, Math.round(freqStart / binHz));
+                    const iEnd = Math.min(magnitudes.length - 1, Math.max(iStart, Math.round((freqStart + BAR_HZ) / binHz) - 1));
+                    if (iStart >= magnitudes.length) break;
+                    let maxMag = 0;
+                    for (let i = iStart; i <= iEnd; i++) {
+                        if (magnitudes[i] > maxMag) maxMag = magnitudes[i];
+                    }
+                    pts.push({ x: freqStart + BAR_HZ / 2, y: maxMag });
+                }
+                chart.data.datasets[0].data = pts as any;
+                chart.update("none");
+            });
+        }, busId);
+        return () => {
+            unsub();
+            if (rafHandle !== null) { cancelAnimationFrame(rafHandle); rafHandle = null; }
+        };
+    }, [graphView, busId]);
 
     const freqOptions = React.useMemo<ChartOptions<"bar" | "line">>(() => ({
         animation: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+            legend: { display: false },
+            zoom: {
+                limits: { x: { min: 0, max: maxFreq, minRange: 20 } },
+                pan: { enabled: false },
+                zoom: {
+                    mode: "x",
+                    drag: {
+                        enabled: true,
+                        threshold: 5,
+                        backgroundColor: "rgba(25, 118, 210, 0.2)",
+                        borderColor: "rgba(25, 118, 210, 0.8)",
+                        borderWidth: 1,
+                    },
+                    wheel: { enabled: true },
+                    pinch: { enabled: false },
+                },
+            },
+        },
         scales: {
             x: {
                 type: "linear",
@@ -684,6 +1009,11 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                         {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
                     </Button>
                 </ButtonGroup>
+            )}
+            {graphView === "freq" && !isLiveRecording && (
+                <Button size="small" variant="outlined" onClick={handleResetZoom}>
+                    {t("experiments.audioAnalysis.components.graph.resetZoom", "Reset")}
+                </Button>
             )}
             {graphView === "time" && !isLiveRecording && (
                 <>
@@ -762,7 +1092,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                     plugins={graphPlugins}
                     redrawToken={playback?.currentTime ?? 0}
                     onChartReady={onChartReady}
-                    style={{ width: "100%", height: "100%" }}
+                    style={{ width: "100%", flex: 1, minHeight: 0 }}
                     chartType={activeChartType}
                 />
             ) : (
@@ -771,6 +1101,20 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                         ? t("experiments.audioAnalysis.components.graph.empty", "Record audio to see the waveform.")
                         : t("experiments.audioAnalysis.components.graph.fftEmpty", "Record audio to see the spectrum.")}
                 </div>
+            )}
+
+            {!isLiveRecording && stftFrame && durationSec && graphView === "freq" && (
+                <Box sx={{ height: 150, flexShrink: 0 }}>
+                    <StftHeatmapCanvas
+                        stftFrame={stftFrame}
+                        duration={durationSec}
+                        currentTime={playback?.currentTime ?? 0}
+                        onSeek={handleSeek}
+                        viewStart={zoomWindow?.start ?? 0}
+                        viewEnd={zoomWindow?.end ?? durationSec}
+                        cutSelection={cutSelection}
+                    />
+                </Box>
             )}
 
             <Dialog open={!!cutSelection} onClose={handleCancelCut}>

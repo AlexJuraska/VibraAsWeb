@@ -18,7 +18,7 @@ import { audioRecordingBus } from "../../audioAnalysis/state/audioRecordingBus";
 import { encodeWav } from "../../../utils/encodeWav";
 
 const MIN_FREQ = 40;
-const MAX_FREQ = 4000;
+const MAX_FREQ = 10000;
 const MIN_DURATION = 1;
 const MAX_DURATION = 120;
 const DEFAULT_START_FREQ = 200;

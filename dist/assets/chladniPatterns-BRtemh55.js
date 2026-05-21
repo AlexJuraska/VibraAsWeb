@@ -1,1 +1,0 @@
-import{W as e,Z as t}from"./Box-DWi8kXNP.js";import{r as n,t as r}from"./ComponentMap-DCrqoUUS.js";import{t as i}from"./index-BvnzpTqC.js";import{t as a}from"./chladniPatternsLayout-DM3aJp0T.js";t();var o=e();function s(){return i(`home.experiment_chladni`,`Chladni's Patterns`),(0,o.jsx)(n,{config:a,components:r})}function c(){return(0,o.jsx)(s,{})}export{c as default};

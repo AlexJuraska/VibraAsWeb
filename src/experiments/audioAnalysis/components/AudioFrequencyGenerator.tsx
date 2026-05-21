@@ -3,7 +3,7 @@ import { Box, FormControl, InputLabel, MenuItem, Select, Slider, Stack, TextFiel
 import { useTranslation } from "../../../i18n/i18n";
 
 const MIN_FREQ = 40;
-const MAX_FREQ = 4000;
+const MAX_FREQ = 10000;
 const DEFAULT_FREQ = 440;
 const OUTPUT_GAIN = 0.2;
 const STORAGE_KEY = "audioAnalysis.sinkId";
