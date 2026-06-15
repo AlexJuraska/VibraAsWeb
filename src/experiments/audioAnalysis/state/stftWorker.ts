@@ -1,5 +1,6 @@
 // Runs entirely off the main thread.
 import FFT from "fft.js";
+import { fillFrequencyBars } from "./frequencyBars";
 
 const EPS = 1e-12;
 const TARGET_BIN_HZ = 2;
@@ -129,6 +130,10 @@ self.onmessage = (e: MessageEvent<{ busId: string; samples: Float32Array; sample
         const barSpectrum = barFft.createComplexArray();
         const barBuffer = new Float32Array(barFrameSize);
         const barHannWin = getHann(barFrameSize);
+        const barBins = barFrameSize / 2;
+        const barFrequencies = new Float32Array(barBins + 1);
+        const barMagnitudes = new Float32Array(barBins + 1);
+        for (let b = 0; b <= barBins; b++) barFrequencies[b] = (b * sampleRate) / barFrameSize;
 
         for (let fi = 0; fi < barNumFrames; fi++) {
             const start = fi * BAR_HOP;
@@ -145,22 +150,36 @@ self.onmessage = (e: MessageEvent<{ busId: string; samples: Float32Array; sample
             barFft.completeSpectrum(barSpectrum);
 
             const barNorm = 2 / (barFrameSize * barGain);
-            const barBins = barFrameSize / 2;
             for (let b = 0; b <= barBins; b++) {
                 const re = barSpectrum[2 * b], im = barSpectrum[2 * b + 1];
                 const mag = Math.sqrt(re * re + im * im) * barNorm;
-                const scaledMag = mag < EPS ? EPS : mag;
-                const barIdx = Math.floor((b * sampleRate) / (barFrameSize * BAR_HZ_W));
-                if (barIdx >= 0 && barIdx < barNumBars) {
-                    const slot = fi * barNumBars + barIdx;
-                    if (scaledMag > barData[slot]) barData[slot] = scaledMag;
-                }
+                barMagnitudes[b] = mag < EPS ? EPS : mag;
             }
+
+            const frameBars = barData.subarray(fi * barNumBars, fi * barNumBars + barNumBars);
+            fillFrequencyBars(frameBars, barMagnitudes, barFrequencies, BAR_HZ_W);
         }
     }
 
+    // Amplitude envelope at 0.001 s per frame — peak-abs of raw samples, no FFT needed.
+    const envHop = Math.max(1, Math.round(sampleRate / 1000));
+    const numEnvFrames = Math.max(1, Math.floor(samples.length / envHop));
+    const envData = new Float32Array(numEnvFrames);
+    const envTimeBins = new Float32Array(numEnvFrames);
+    for (let fi = 0; fi < numEnvFrames; fi++) {
+        const start = fi * envHop;
+        const end = Math.min(start + envHop, samples.length);
+        envTimeBins[fi] = (start + (end - start) * 0.5) / sampleRate;
+        let maxAbs = 0;
+        for (let i = start; i < end; i++) {
+            const abs = Math.abs(samples[i]);
+            if (abs > maxAbs) maxAbs = abs;
+        }
+        envData[fi] = maxAbs;
+    }
+
     (self as unknown as Worker).postMessage(
-        { busId, numFrames, numBins: bins, frameSize: size, hopSize: hop, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames },
-        [timeBins.buffer, frequencies.buffer, stftData.buffer, spikeData.buffer, barData.buffer, barTimeBins.buffer],
+        { busId, numFrames, numBins: bins, frameSize: size, hopSize: hop, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames },
+        [timeBins.buffer, frequencies.buffer, stftData.buffer, spikeData.buffer, barData.buffer, barTimeBins.buffer, envData.buffer, envTimeBins.buffer],
     );
 };

@@ -12,6 +12,7 @@ import { audioPlaybackBus } from "../state/audioPlaybackBus";
 import { useTranslation } from "../../../i18n/i18n";
 import { audioFftBus, useAudioFft, useAudioFftPeak } from "../state/audioFftBus";
 import { useAudioStft, deriveMaxFrequency, type AudioStftFrame } from "../state/audioStftBus";
+import { buildFrequencyBars, fillFrequencyBars, getFrequencyBarCount } from "../state/frequencyBars";
 import { encodeWav } from "../../../utils/encodeWav";
 
 const MAX_POINTS = 15000;
@@ -332,23 +333,15 @@ function getStftMagnitudesAtTime(stftFrame: AudioStftFrame, timeSec: number): Fl
     return _stftMagBuf;
 }
 
-// HSL → RGB helper and pre-built color lookup table (computed once at module load).
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-    const a = s * Math.min(l, 1 - l);
-    const f = (n: number) => {
-        const k = (n + h * 12) % 12;
-        return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-    };
-    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
-}
-
+// Pre-built color lookup table: linear RGB interpolation from pale green (silence) to dark green (loud).
+// ratio=0 → (210, 249, 210), ratio=1 → (6, 45, 6)
 const SPECTROGRAM_COLORS = (() => {
     const table = new Uint8ClampedArray(256 * 3);
     for (let i = 0; i < 256; i++) {
-        const intensity = i / 255;
-        // intensity=0 → lightness 90% (pale = silence), intensity=1 → lightness 10% (dark = loud spike)
-        const [r, g, b] = hslToRgb(120 / 360, 0.75, (90 - 80 * intensity) / 100);
-        table[i * 3] = r; table[i * 3 + 1] = g; table[i * 3 + 2] = b;
+        const ratio = i / 255;
+        table[i * 3]     = Math.round(210 + (6   - 210) * ratio);
+        table[i * 3 + 1] = Math.round(249 + (45  - 249) * ratio);
+        table[i * 3 + 2] = Math.round(210 + (6   - 210) * ratio);
     }
     return table;
 })();
@@ -415,8 +408,7 @@ const StftHeatmapCanvas: React.FC<{
         // correct timeBins[fi] position), so a simple proportional crop suffices.
         const srcX = (vs / dur) * offCanvas.width;
         const srcW = Math.max(1, (viewDuration / dur) * offCanvas.width);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
+        ctx.imageSmoothingEnabled = false;
         ctx.drawImage(offCanvas, srcX, 0, srcW, offCanvas.height, padL, 0, chartW, cssH);
 
         const toX = (t: number) => padL + ((t - vs) / viewDuration) * chartW;
@@ -447,29 +439,29 @@ const StftHeatmapCanvas: React.FC<{
     }, []);
 
     // Build the full offscreen heatmap once per recording.
-    // The canvas spans [0, duration]: each STFT frame is placed at the pixel that
-    // corresponds to its center time (timeBins[fi] / duration * canvasWidth).
-    // The extra `frameSize/hopSize` pixels widen the canvas to accommodate the
-    // half-frame offset so the first/last frames land at the right positions
-    // without leaving gaps between consecutive frames (frame spacing = 1 px).
+    // Uses the 0.001 s amplitude envelope (envData) when available — one pixel per ms,
+    // placed at the pixel corresponding to envTimeBins[fi] / duration * canvasWidth.
     React.useEffect(() => {
-        const { stftMatrix, timeBins, frameSize, hopSize } = stftFrame;
-        const numFrames = timeBins.length;
+        const { stftMatrix, timeBins, frameSize, hopSize, envData, envTimeBins } = stftFrame;
         const dur = durationRef.current;
 
-        // Extra width = frameSize/hopSize so that pixel spacing between consecutive
-        // frames is exactly 1, with silence pixels padding both ends.
-        const canvasWidth = Math.max(1, numFrames + Math.round(frameSize / hopSize));
-
-        const frameMaxes = new Float32Array(numFrames);
-        let gmax = 0;
-        for (const arr of stftMatrix.values()) {
-            for (let fi = 0; fi < arr.length; fi++) {
-                if (arr[fi] > frameMaxes[fi]) frameMaxes[fi] = arr[fi];
+        const useEnv = !!envData && !!envTimeBins && envData.length > 0;
+        const frameAmps = useEnv ? envData! : (() => {
+            const maxes = new Float32Array(timeBins.length);
+            for (const arr of stftMatrix.values()) {
+                for (let fi = 0; fi < arr.length; fi++) {
+                    if (arr[fi] > maxes[fi]) maxes[fi] = arr[fi];
+                }
             }
-        }
+            return maxes;
+        })();
+        const tBins = useEnv ? envTimeBins! : timeBins;
+        const numFrames = frameAmps.length;
+        const canvasWidth = Math.max(1, useEnv ? numFrames : numFrames + Math.round(frameSize / hopSize));
+
+        let gmax = 0;
         for (let i = 0; i < numFrames; i++) {
-            if (frameMaxes[i] > gmax) gmax = frameMaxes[i];
+            if (frameAmps[i] > gmax) gmax = frameAmps[i];
         }
 
         const offCanvas = document.createElement("canvas");
@@ -481,7 +473,6 @@ const StftHeatmapCanvas: React.FC<{
         const imgData = offCtx.createImageData(canvasWidth, 1);
         const data = imgData.data;
 
-        // Fill all pixels with the silence color (level 0 = pale/bright, matching the no-data regions).
         for (let px = 0; px < canvasWidth; px++) {
             const idx = px * 4;
             data[idx] = SPECTROGRAM_COLORS[0];
@@ -490,12 +481,11 @@ const StftHeatmapCanvas: React.FC<{
             data[idx + 3] = 255;
         }
 
-        // Place each STFT frame at its true time-proportional position.
         for (let fi = 0; fi < numFrames; fi++) {
             const px = dur > 0
-                ? Math.min(canvasWidth - 1, Math.round((timeBins[fi] / dur) * canvasWidth))
+                ? Math.min(canvasWidth - 1, Math.round((tBins[fi] / dur) * canvasWidth))
                 : fi;
-            const level = gmax > 0 ? Math.min(255, Math.round((frameMaxes[fi] / gmax) * 255)) : 0;
+            const level = gmax > 0 ? Math.min(255, Math.round((frameAmps[fi] / gmax) * 255)) : 0;
             const ci = level * 3;
             const idx = px * 4;
             data[idx] = SPECTROGRAM_COLORS[ci];
@@ -990,21 +980,14 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
 
         if (magnitudes.length === 0) return undefined;
         const nyquist = sampleRate / 2;
-        const binHz = frequencies.length > 1 ? frequencies[1] : 1;
-        const numBars = Math.floor(maxFreq / BAR_HZ);
+        const barMagnitudes = buildFrequencyBars(magnitudes, frequencies, maxFreq, BAR_HZ);
+        const numBars = barMagnitudes.length;
         const pts: Point[] = [];
         const colors: string[] = [];
         for (let bar = 0; bar < numBars; bar++) {
             const freqStart = bar * BAR_HZ;
-            const iStart = Math.max(0, Math.round(freqStart / binHz));
-            const iEnd = Math.min(magnitudes.length - 1, Math.max(iStart, Math.round((freqStart + BAR_HZ) / binHz) - 1));
-            if (iStart >= magnitudes.length) break;
-            let maxMag = 0;
-            for (let i = iStart; i <= iEnd; i++) {
-                if (magnitudes[i] > maxMag) maxMag = magnitudes[i];
-            }
             const centerFreq = freqStart + BAR_HZ / 2;
-            pts.push({ x: centerFreq, y: maxMag });
+            pts.push({ x: centerFreq, y: barMagnitudes[bar] ?? 0 });
             const hue = Math.max(0, Math.min(120, (centerFreq / Math.min(nyquist, maxFreq)) * 120));
             colors.push(`hsl(${hue}, 90%, 55%)`);
         }
@@ -1070,23 +1053,16 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
 
         // Fallback: live FFT (during recording or before STFT finishes computing).
         // Pre-allocate bar buffer outside the callback to avoid GC pressure at 60fps.
-        const fftBarBuf = new Float32Array(Math.ceil(22050 / BAR_HZ));
+        let fftBarBuf = new Float32Array(getFrequencyBarCount(maxFreqRef.current, BAR_HZ));
         return audioFftBus.subscribe((fftFrame) => {
             if (!fftFrame) return;
             const { magnitudes, frequencies } = fftFrame;
-            const binHz = frequencies.length > 1 ? frequencies[1] : 1;
-            const numBars = Math.floor(maxFreqRef.current / BAR_HZ);
-            for (let bar = 0; bar < numBars; bar++) {
-                const freqStart = bar * BAR_HZ;
-                const iStart = Math.max(0, Math.round(freqStart / binHz));
-                const iEnd = Math.min(magnitudes.length - 1, Math.max(iStart, Math.round((freqStart + BAR_HZ) / binHz) - 1));
-                let maxMag = 0;
-                for (let i = iStart; i <= iEnd; i++) {
-                    if (magnitudes[i] > maxMag) maxMag = magnitudes[i];
-                }
-                fftBarBuf[bar] = maxMag;
+            const numBars = getFrequencyBarCount(maxFreqRef.current, BAR_HZ);
+            if (fftBarBuf.length !== numBars) {
+                fftBarBuf = new Float32Array(numBars);
             }
-            updateBars(fftBarBuf, numBars);
+            fillFrequencyBars(fftBarBuf, magnitudes, frequencies, BAR_HZ);
+            updateBars(fftBarBuf, fftBarBuf.length);
         }, busId);
     }, [graphView, busId, stftFrame]);
 

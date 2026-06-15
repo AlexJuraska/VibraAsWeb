@@ -22,6 +22,10 @@ export type AudioStftFrame = {
     barTimeBins?: Float32Array;
     barNumBars?: number;
     barNumFrames?: number;
+    // Amplitude envelope at 0.001 s resolution for heatmap rendering.
+    envData?: Float32Array;
+    envTimeBins?: Float32Array;
+    numEnvFrames?: number;
 };
 
 type Listener = (frame: AudioStftFrame | undefined) => void;
@@ -204,7 +208,7 @@ function getWorker(): Worker {
     if (worker) return worker;
     worker = new Worker(new URL("./stftWorker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent) => {
-        const { busId, error, numFrames, numBins, frameSize, hopSize, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames } = e.data;
+        const { busId, error, numFrames, numBins, frameSize, hopSize, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames } = e.data;
         const cb = pendingByBus.get(busId);
         pendingByBus.delete(busId);
         if (!cb) return;
@@ -228,7 +232,7 @@ function getWorker(): Worker {
             entries.push({ timeIdx, timeSec, magnitude });
         }
 
-        cb({ stftMatrix, frequencies, timeBins, spikeMap, frameSize, hopSize, sampleRate, barData, barTimeBins, barNumBars, barNumFrames });
+        cb({ stftMatrix, frequencies, timeBins, spikeMap, frameSize, hopSize, sampleRate, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames });
     };
     worker.onerror = (e) => {
         console.error("STFT worker error:", e);
