@@ -16,6 +16,12 @@ export type AudioStftFrame = {
     frameSize: number;
     hopSize: number;
     sampleRate: number;
+    // Fine-resolution pre-computed bar data for smooth bar-chart playback.
+    // Layout: barData[frameIdx * barNumBars + barIdx] = max magnitude.
+    barData?: Float32Array;
+    barTimeBins?: Float32Array;
+    barNumBars?: number;
+    barNumFrames?: number;
 };
 
 type Listener = (frame: AudioStftFrame | undefined) => void;
@@ -187,12 +193,67 @@ function publish(frame: AudioStftFrame | undefined, busId = "main") {
     getListeners(busId).forEach((l) => l(frame));
 }
 
+// --- Web Worker for off-thread STFT computation ---
+
+let worker: Worker | null = null;
+// Map from busId → callback waiting for the worker result.
+// Only one computation per busId at a time; a new recording supersedes the previous one.
+const pendingByBus = new Map<string, (frame: AudioStftFrame | undefined) => void>();
+
+function getWorker(): Worker {
+    if (worker) return worker;
+    worker = new Worker(new URL("./stftWorker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (e: MessageEvent) => {
+        const { busId, error, numFrames, numBins, frameSize, hopSize, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames } = e.data;
+        const cb = pendingByBus.get(busId);
+        pendingByBus.delete(busId);
+        if (!cb) return;
+        if (error) { cb(undefined); return; }
+
+        // Reconstruct stftMatrix as views into the transferred flat buffer (zero-copy).
+        const stftMatrix = new Map<number, Float32Array>();
+        for (let b = 0; b <= numBins; b++) {
+            stftMatrix.set(b, (stftData as Float32Array).subarray(b * numFrames, (b + 1) * numFrames));
+        }
+
+        // Reconstruct spike map from packed [binIdx, frameIdx, timeSec, magnitude, ...].
+        const spikeMap = new Map<number, SpikeEntry[]>();
+        for (let i = 0; i < (spikeData as Float32Array).length; i += 4) {
+            const binIdx = Math.round(spikeData[i]);
+            const timeIdx = Math.round(spikeData[i + 1]);
+            const timeSec = spikeData[i + 2];
+            const magnitude = spikeData[i + 3];
+            let entries = spikeMap.get(binIdx);
+            if (!entries) { entries = []; spikeMap.set(binIdx, entries); }
+            entries.push({ timeIdx, timeSec, magnitude });
+        }
+
+        cb({ stftMatrix, frequencies, timeBins, spikeMap, frameSize, hopSize, sampleRate, barData, barTimeBins, barNumBars, barNumFrames });
+    };
+    worker.onerror = (e) => {
+        console.error("STFT worker error:", e);
+        for (const cb of pendingByBus.values()) cb(undefined);
+        pendingByBus.clear();
+    };
+    return worker;
+}
+
+function computeStftAsync(rec: AudioRecording, busId: string) {
+    // Register callback; any previously pending result for this busId is superseded.
+    pendingByBus.set(busId, (frame) => publish(frame, busId));
+    // Copy samples so the worker can take ownership via transfer (the original stays intact).
+    const copy = new Float32Array(rec.samples);
+    getWorker().postMessage({ busId, samples: copy, sampleRate: rec.sampleRate }, [copy.buffer]);
+}
+
 function ensureSubscription(busId: string) {
     if (recordingSubscriptions.has(busId)) return;
     const unsub = audioRecordingBus.subscribe((rec) => {
         if (rec?.blob) {
-            publish(computeStftFull(rec), busId);
+            computeStftAsync(rec, busId);
         } else {
+            // Cancel any in-flight computation for this bus.
+            pendingByBus.delete(busId);
             publish(undefined, busId);
         }
     }, busId);

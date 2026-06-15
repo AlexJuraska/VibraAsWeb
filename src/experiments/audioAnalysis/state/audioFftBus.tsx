@@ -21,8 +21,8 @@ const playbackCache = new Map<string, AudioPlayback | undefined>();
 const rafHandles = new Map<string, number>();
 const lastFrameState = new Map<string, { lastTime: number; lastTs: number }>();
 const EPS = 1e-12;
-const DEFAULT_FFT_SIZE = 2048;
-const PLAYBACK_FPS_MS = 33;
+const DEFAULT_FFT_SIZE = 8192;
+const PLAYBACK_FPS_MS = 16;
 const PEAK_TARGET_FRAMES = 200;
 
 const fftInstances = new Map<number, FFT>();
@@ -30,6 +30,47 @@ function getFft(size: number): FFT {
     let inst = fftInstances.get(size);
     if (!inst) { inst = new FFT(size); fftInstances.set(size, inst); }
     return inst;
+}
+
+// Per-size reusable buffers — avoids GC pressure in the 60 fps FFT loop.
+const hannWindows = new Map<number, Float32Array>();
+const inputBuffers = new Map<number, Float32Array>();
+const spectrumBuffers = new Map<number, ReturnType<FFT["createComplexArray"]>>();
+// Frequency axis never changes for a given (size, sampleRate) pair.
+const frequencyArrays = new Map<string, Float32Array>();
+
+function getHannWindow(size: number): Float32Array {
+    let w = hannWindows.get(size);
+    if (!w) {
+        w = new Float32Array(size);
+        for (let i = 0; i < size; i++) w[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (size - 1)));
+        hannWindows.set(size, w);
+    }
+    return w;
+}
+
+function getInputBuffer(size: number): Float32Array {
+    let b = inputBuffers.get(size);
+    if (!b) { b = new Float32Array(size); inputBuffers.set(size, b); }
+    return b;
+}
+
+function getSpectrumBuffer(size: number): ReturnType<FFT["createComplexArray"]> {
+    let b = spectrumBuffers.get(size);
+    if (!b) { b = getFft(size).createComplexArray(); spectrumBuffers.set(size, b); }
+    return b;
+}
+
+function getFrequencies(size: number, sampleRate: number): Float32Array {
+    const key = `${size}_${sampleRate}`;
+    let f = frequencyArrays.get(key);
+    if (!f) {
+        const bins = size / 2;
+        f = new Float32Array(bins + 1);
+        for (let i = 0; i <= bins; i++) f[i] = (i * sampleRate) / size;
+        frequencyArrays.set(key, f);
+    }
+    return f;
 }
 
 function getListeners(busId: string): Set<Listener> {
@@ -56,19 +97,23 @@ function computeFftAtTime(rec: AudioRecording, timeSec = 0, fftSize = DEFAULT_FF
     let start = Math.max(0, centerSample - half);
     if (start + size > rec.samples.length) start = Math.max(0, rec.samples.length - size);
 
-    const input = new Float32Array(size);
+    // Reuse cached intermediate buffers — these are never stored externally.
+    const input = getInputBuffer(size);
+    input.fill(0);
     const available = Math.max(0, Math.min(size, rec.samples.length - start));
     if (available > 0) input.set(rec.samples.subarray(start, start + available));
-    const windowGain = applyHannWindow(input);
+    const windowGain = applyHannWindow(input, getHannWindow(size));
 
     const fft = getFft(size);
-    const spectrum = fft.createComplexArray();
+    const spectrum = getSpectrumBuffer(size);
     fft.realTransform(spectrum, input);
     fft.completeSpectrum(spectrum);
 
     const bins = size / 2;
+    // magnitudes must be a fresh array — it is handed to React state and stored across renders.
     const magnitudes = new Float32Array(bins + 1);
-    const frequencies = new Float32Array(bins + 1);
+    // frequencies is static for this (size, sampleRate) — reuse the cached copy.
+    const frequencies = getFrequencies(size, rec.sampleRate);
 
     for (let i = 0; i <= bins; i++) {
         const real = spectrum[2 * i];
@@ -76,19 +121,17 @@ function computeFftAtTime(rec: AudioRecording, timeSec = 0, fftSize = DEFAULT_FF
         const mag = Math.sqrt(real * real + imag * imag);
         const scaled = (2 * mag) / (size * windowGain);
         magnitudes[i] = scaled < EPS ? EPS : scaled;
-        frequencies[i] = (i * rec.sampleRate) / size;
     }
 
     return { magnitudes, frequencies, fftSize: size, sampleRate: rec.sampleRate };
 }
 
-function applyHannWindow(buffer: Float32Array): number {
+function applyHannWindow(buffer: Float32Array, win: Float32Array): number {
     const len = buffer.length;
     let sum = 0;
     for (let i = 0; i < len; i++) {
-        const w = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (len - 1)));
-        buffer[i] *= w;
-        sum += w;
+        buffer[i] *= win[i];
+        sum += win[i];
     }
     return sum / len;
 }
@@ -152,8 +195,9 @@ function computeFftPeak(rec: AudioRecording, fftSize = DEFAULT_FFT_SIZE, hop = f
     if (!rec.samples || rec.samples.length === 0 || rec.sampleRate <= 0) return undefined;
     const size = Math.max(2, nextPowerOfTwo(Math.min(rec.samples.length, fftSize)));
     const fft = getFft(size);
-    const spectrum = fft.createComplexArray();
-    const buffer = new Float32Array(size);
+    const spectrum = getSpectrumBuffer(size);
+    const buffer = getInputBuffer(size);
+    const hannWin = getHannWindow(size);
     let max = 0;
     const minHop = Math.max(1, hop);
     const targetHop = Math.max(minHop, Math.floor(rec.samples.length / PEAK_TARGET_FRAMES));
@@ -161,7 +205,7 @@ function computeFftPeak(rec: AudioRecording, fftSize = DEFAULT_FFT_SIZE, hop = f
         buffer.fill(0);
         const available = Math.min(size, rec.samples.length - start);
         if (available > 0) buffer.set(rec.samples.subarray(start, start + available));
-        const windowGain = applyHannWindow(buffer);
+        const windowGain = applyHannWindow(buffer, hannWin);
         fft.realTransform(spectrum, buffer);
         fft.completeSpectrum(spectrum);
         const bins = size / 2;

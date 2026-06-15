@@ -92,7 +92,7 @@ const isValidChartData = (d: any): d is ChartDataProps => {
     return d.datasets.every((ds: any) => Array.isArray(ds?.data));
 };
 
-const Graph: React.FC<Props> = ({ data, options, plugins, className, style, chartType = "line", redrawToken, onChartReady }) => {
+const Graph: React.FC<Props> = React.memo(({ data, options, plugins, className, style, chartType = "line", redrawToken, onChartReady }) => {
     const theme = useTheme<Theme>();
     const chartRef = React.useRef<any>(null);
     const onChartReadyRef = React.useRef<typeof onChartReady>(onChartReady);
@@ -168,6 +168,6 @@ const Graph: React.FC<Props> = ({ data, options, plugins, className, style, char
             <ChartComponent ref={setChartRef} data={themedData as any} options={mergedOptions as any} plugins={plugins as any} />
         </Box>
     );
-};
+}) as React.FC<Props>;
 
 export default Graph;

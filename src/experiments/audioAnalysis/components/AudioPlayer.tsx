@@ -2,7 +2,8 @@ import React from "react";
 import { IconButton, Slider, Stack, Typography } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
-import { audioPlaybackBus, useAudioPlayback } from "../state/audioPlaybackBus";
+import { audioPlaybackBus } from "../state/audioPlaybackBus";
+import type { AudioPlayback } from "../state/audioPlaybackBus";
 import { useAudioRecording } from "../state/audioRecordingBus";
 
 const formatTime = (s: number): string => {
@@ -26,37 +27,52 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const [isPlaying, setIsPlaying] = React.useState(false);
     const [seekTime, setSeekTime] = React.useState<number | null>(null);
     const [elDuration, setElDuration] = React.useState(0);
+    const [currentTime, setCurrentTime] = React.useState(0);
     const isSeeking = React.useRef(false);
     const rafRef = React.useRef<number | null>(null);
+    // Prevents the external-seek subscription from reacting to our own publishes.
+    const isOurPublishRef = React.useRef(false);
 
-    const playback = useAudioPlayback(busId);
     const recording = useAudioRecording(busId);
 
+    // Prefer the actual audio file duration once metadata is loaded; fall back to PCM calculation.
     const duration = React.useMemo(() => {
+        if (elDuration > 0) return elDuration;
         if (recording && recording.sampleRate > 0 && recording.samples.length > 0) {
             return recording.samples.length / recording.sampleRate;
         }
-        return elDuration;
+        return 0;
     }, [recording, elDuration]);
 
-    const displayTime = seekTime ?? playback?.currentTime ?? 0;
+    const displayTime = seekTime ?? currentTime;
+
+    // Wraps every bus publish so the subscription below can tell which updates originated here.
+    const publishPlayback = React.useCallback((state: AudioPlayback) => {
+        isOurPublishRef.current = true;
+        audioPlaybackBus.publish(state, busId);
+        isOurPublishRef.current = false;
+    }, [busId]);
+
+    // React to external seeks (graph or heatmap clicks) by actually moving the audio element.
+    React.useEffect(() => {
+        return audioPlaybackBus.subscribe((state) => {
+            if (isOurPublishRef.current) return;
+            if (state?.currentTime == null) return;
+            const el = audioRef.current;
+            if (el) el.currentTime = state.currentTime;
+            setCurrentTime(state.currentTime);
+        }, busId);
+    }, [busId]);
 
     React.useEffect(() => {
         setIsPlaying(false);
         setSeekTime(null);
         setElDuration(0);
+        setCurrentTime(0);
         isSeeking.current = false;
-
-        audioPlaybackBus.publish(
-            { currentTime: 0, duration: 0, playing: false },
-            busId
-        );
-
-        const el = audioRef.current;
-        if (el) {
-            el.pause();
-        }
-    }, [busId, url]);
+        publishPlayback({ currentTime: 0, duration: 0, playing: false });
+        audioRef.current?.pause();
+    }, [busId, url, publishPlayback]);
 
     React.useEffect(() => {
         if (!isPlaying) {
@@ -70,40 +86,28 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         const tick = () => {
             const el = audioRef.current;
             if (!el) return;
-
             if (!isSeeking.current) {
-                audioPlaybackBus.publish(
-                    {
-                        currentTime: el.currentTime,
-                        duration: el.duration,
-                        playing: !el.paused,
-                    },
-                    busId
-                );
+                const ct = el.currentTime;
+                setCurrentTime(ct);
+                publishPlayback({ currentTime: ct, duration: el.duration, playing: !el.paused });
             }
-
             rafRef.current = requestAnimationFrame(tick);
         };
 
         rafRef.current = requestAnimationFrame(tick);
-
         return () => {
             if (rafRef.current) {
                 cancelAnimationFrame(rafRef.current);
                 rafRef.current = null;
             }
         };
-    }, [isPlaying, busId]);
+    }, [isPlaying, busId, publishPlayback]);
 
     const handlePlayPause = () => {
         const el = audioRef.current;
         if (!el) return;
-
         if (el.paused) {
-            const playPromise = el.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(() => {});
-            }
+            el.play().catch(() => {});
         } else {
             el.pause();
         }
@@ -113,43 +117,23 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         const t = Array.isArray(value) ? value[0] : value;
         isSeeking.current = true;
         setSeekTime(t);
-        audioPlaybackBus.publish(
-            { currentTime: t, duration, playing: isPlaying },
-            busId
-        );
+        publishPlayback({ currentTime: t, duration, playing: isPlaying });
     };
 
-    const handleSliderChangeCommitted = (
-        _: React.SyntheticEvent | Event,
-        value: number | number[]
-    ) => {
+    const handleSliderChangeCommitted = (_: React.SyntheticEvent | Event, value: number | number[]) => {
         const t = Array.isArray(value) ? value[0] : value;
         const el = audioRef.current;
-
-        if (el) {
-            el.currentTime = t;
-        }
-
+        if (el) el.currentTime = t;
         isSeeking.current = false;
+        setCurrentTime(t);
         setSeekTime(null);
-
-        audioPlaybackBus.publish(
-            {
-                currentTime: t,
-                duration: el?.duration ?? duration,
-                playing: !el?.paused,
-            },
-            busId
-        );
+        publishPlayback({ currentTime: t, duration: el?.duration ?? duration, playing: !el?.paused });
     };
 
     return (
         <Stack
             spacing={0.5}
-            sx={{
-                opacity: disabled ? 0.5 : 1,
-                pointerEvents: disabled ? "none" : "auto",
-            }}
+            sx={{ opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? "none" : "auto" }}
         >
             <audio
                 ref={audioRef}
@@ -157,34 +141,26 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 onLoadedMetadata={(e) => setElDuration(e.currentTarget.duration)}
                 onPlay={() => {
                     setIsPlaying(true);
-                    audioPlaybackBus.publish(
-                        {
-                            currentTime: audioRef.current?.currentTime ?? 0,
-                            duration: audioRef.current?.duration ?? 0,
-                            playing: true,
-                        },
-                        busId
-                    );
+                    publishPlayback({
+                        currentTime: audioRef.current?.currentTime ?? 0,
+                        duration: audioRef.current?.duration ?? 0,
+                        playing: true,
+                    });
                 }}
                 onPause={() => {
                     setIsPlaying(false);
-                    audioPlaybackBus.publish(
-                        {
-                            currentTime: audioRef.current?.currentTime ?? 0,
-                            duration: audioRef.current?.duration ?? 0,
-                            playing: false,
-                        },
-                        busId
-                    );
+                    publishPlayback({
+                        currentTime: audioRef.current?.currentTime ?? 0,
+                        duration: audioRef.current?.duration ?? 0,
+                        playing: false,
+                    });
                 }}
                 onEnded={() => {
                     const el = audioRef.current;
                     const endTime = el?.duration ?? duration;
                     setIsPlaying(false);
-                    audioPlaybackBus.publish(
-                        { currentTime: endTime, duration: endTime, playing: false },
-                        busId
-                    );
+                    setCurrentTime(endTime);
+                    publishPlayback({ currentTime: endTime, duration: endTime, playing: false });
                 }}
             />
 
@@ -195,17 +171,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     aria-label={isPlaying ? "Pause" : "Play"}
                     disabled={disabled}
                 >
-                    {isPlaying ? (
-                        <PauseIcon fontSize="small" />
-                    ) : (
-                        <PlayArrowIcon fontSize="small" />
-                    )}
+                    {isPlaying ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
                 </IconButton>
 
-                <Typography
-                    variant="body2"
-                    sx={{ fontFamily: "monospace", minWidth: 74, userSelect: "none" }}
-                >
+                <Typography variant="body2" sx={{ fontFamily: "monospace", minWidth: 74, userSelect: "none" }}>
                     {formatTime(displayTime)}
                 </Typography>
 
@@ -214,7 +183,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     min={0}
                     max={duration || 1}
                     step={0.001}
-                    value={Number.isFinite(displayTime) ? displayTime : 0}
+                    value={Number.isFinite(displayTime) ? Math.min(displayTime, duration || 1) : 0}
                     onChange={handleSliderChange}
                     onChangeCommitted={handleSliderChangeCommitted}
                     disabled={disabled}
@@ -223,12 +192,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
                 <Typography
                     variant="body2"
-                    sx={{
-                        fontFamily: "monospace",
-                        minWidth: 74,
-                        textAlign: "right",
-                        userSelect: "none",
-                    }}
+                    sx={{ fontFamily: "monospace", minWidth: 74, textAlign: "right", userSelect: "none" }}
                 >
                     {formatTime(duration)}
                 </Typography>
