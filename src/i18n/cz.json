@@ -13,7 +13,10 @@
   },
   "components": {
     "fileDownloader": "Stáhnout soubor",
-    "homeButton": "Domů",
+    "homeButton": {
+      "label": "Domů",
+      "tooltip": "Vrátit se na domovskou stránku"
+    },
     "languageSelector": "Výběr jazyka"
   },
   "experiments": {
@@ -25,10 +28,15 @@
           "browserNotSupported": "Výběr výstupního zařízení není v tomto prohlížeči podporován.",
           "defaultAudio": "Předvolený systémem",
           "audioDevice": "Audio zařízení",
-          "refresh": "Obnovit zařízení"
+          "refresh": "Obnovit zařízení",
+          "noDevice": "Žádné zařízení"
         },
         "frequencySlider": {
-          "label": "Frekvence"
+          "label": "Frekvence",
+          "tooltip": {
+            "decrease": "Snížit frekvenci o 1 Hz (podržte pro opakování)",
+            "increase": "Zvýšit frekvenci o 1 Hz (podržte pro opakování)"
+          }
         },
         "gainSlider": {
           "label": "Zesílení"
@@ -42,7 +50,11 @@
           "noSavedFrequencies": "Nemáte žádné uložené frekvence. Můžete přidat více pomocí tlačítka níže nebo importovat soubor s uloženými frekvencemi.",
           "import": "Importovat uložené frekvence",
           "saveFrequency": "Uložit aktuální frekvenci",
-          "current": "(aktuální)"
+          "current": "(aktuální)",
+          "tooltip": {
+            "save": "Přidat",
+            "saveList": "do seznamu uložených frekvencí"
+          }
         },
         "startStop": {
           "stop": "Zastavit zvuk",
@@ -61,7 +73,8 @@
           "mediaDevicesUnavailable": "API pro média není dostupné.",
           "defaultAudio": "Předvolený systémem",
           "audioDevice": "Audio zařízení",
-          "refresh": "Obnovit zařízení"
+          "refresh": "Obnovit zařízení",
+          "noDevice": "Žádné zařízení"
         },
         "audioRecorder": {
           "start": "Nahrát",
@@ -72,25 +85,86 @@
           "startError": "Nelze spustit nahrávání.",
           "recordingError": "Nahrávání se nezdařilo.",
           "decodeError": "Nahrávku se nepodařilo dekódovat.",
-          "unsupported": "MediaRecorder není v tomto prohlížeči podporován."
+          "unsupported": "MediaRecorder není v tomto prohlížeči podporován.",
+          "tooltip": {
+            "processing": "Zpracovávám nahrávku…",
+            "start": "Nahrávat zvuk z vybraného mikrofonu",
+            "stop": "Zastavit a uložit nahrávku"
+          }
         },
         "audioFileUploader": {
           "button": "Nahrát WAV",
           "loading": "Načítání…",
           "onlyWav": "Vyberte prosím soubor .wav.",
-          "decodeError": "Audio soubor se nepodařilo načíst."
+          "decodeError": "Audio soubor se nepodařilo načíst.",
+          "tooLong": "Soubor je příliš dlouhý. Maximální délka je 30 minut.",
+          "tooltip": {
+            "button": "Načíst WAV soubor k analýze",
+            "loading": "Dekóduji audio soubor…"
+          }
         },
         "graph": {
           "xAxis": "Čas (s)",
           "yAxis": "Amplituda",
           "empty": "Nahrajte zvuk pro zobrazení průběhu.",
-          "dataset": "Záznam"
+          "dataset": "Záznam",
+          "spectrogramTooltip": "Spektrogram — kliknutím pro navigaci",
+          "waveform": "Průběh",
+          "fft": "FFT",
+          "zoomMode": "Zoom",
+          "cutMode": "Ořez",
+          "resetZoom": "Resetovat",
+          "autoTooltip": "Automaticky zobrazovat hodnoty",
+          "cancel": "Zrušit",
+          "confirmCut": "Oříznout",
+          "cutConfirmTitle": "Potvrdit ořez",
+          "cutConfirmText": "Zachovat pouze vybraný úsek a zahodit zbytek?",
+          "fftEmpty": "Nahrajte zvuk pro zobrazení spektra.",
+          "fftDataset": "FFT",
+          "freqAxis": "Frekvence (Hz)",
+          "magAxis": "Amplituda",
+          "scrollZoom": "Posunout zobrazení",
+          "tooltip": {
+            "waveform": "Zobrazit zvukový průběh v čase",
+            "fft": "Zobrazit frekvenční spektrum (FFT)",
+            "zoomMode": "Přetažením přiblížit oblast",
+            "cutMode": "Přetažením vyberte oblast k ořezu",
+            "resetZoom": "Resetovat zoom pro zobrazení celého spektra",
+            "resetZoomTime": "Resetovat zoom pro zobrazení celé nahrávky",
+            "autoTooltip": "Průběžně zobrazovat hodnotu amplitudy na pozici přehrávání",
+            "scrollLeft": "Posunout doleva",
+            "scrollRight": "Posunout doprava"
+          }
         },
         "frequencyGenerator": {
           "title": "Generátor frekvence",
           "frequency": "Frekvence",
           "start": "Pustit zvuk",
-          "stop": "Zastavit zvuk"
+          "stop": "Zastavit zvuk",
+          "systemDefault": "Předvolený systémem"
+        },
+        "resonantFrequencyList": {
+          "title": "Rezonanční frekvence",
+          "play": "Přehrát"
+        },
+        "audioPlayer": {
+          "play": "Přehrát",
+          "pause": "Pozastavit"
+        },
+        "audioControlsPanel": {
+          "singleLayout": "Jednoduchý režim",
+          "dualLayout": "Dvougrafový režim (dvě nahrávky)",
+          "tooltip": {
+            "single": "Přepnout na zobrazení jedné nahrávky",
+            "dual": "Přepnout na dvojité zobrazení pro porovnání dvou nahrávek vedle sebe"
+          }
+        },
+        "audioRecordingDebug": {
+          "noRecording": "Zatím žádná nahrávka.",
+          "title": "Informace o nahrávce",
+          "duration": "Délka",
+          "sampleRate": "Vzorkovací frekvence",
+          "samples": "Vzorky"
         }
       }
     },
@@ -103,7 +177,13 @@
           "duration": "Doba trvání",
           "start": "Nahrát sweep",
           "stop": "Zastavit nahrávání",
-          "invalidRange": "Neplatné nastavení sweepu."
+          "invalidRange": "Neplatné nastavení sweepu.",
+          "systemDefault": "Předvolený systémem",
+          "tooltip": {
+            "processing": "Zpracovávám nahrávku…",
+            "start": "Přehrát frekvenční sweep přes reproduktor a zaznamenat odezvu mikrofonu",
+            "stop": "Zastavit sweep a uložit nahrávku"
+          }
         }
       }
     }

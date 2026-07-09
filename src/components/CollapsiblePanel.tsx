@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, IconButton, Drawer, useTheme } from "@mui/material";
+import { Box, IconButton, Drawer, useTheme, Tooltip } from "@mui/material";
 import { Menu as MenuIcon, ChevronLeft } from "@mui/icons-material";
 import { ComponentMap } from "../layout-system/types/ComponentMap";
 import { useAudioRecording } from "../experiments/audioAnalysis/state/audioRecordingBus";
@@ -95,28 +95,30 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                         boxSizing: "border-box",
                     }}
                 >
-                    <IconButton
-                        onClick={toggle}
-                        sx={{
-                            width: "100%",
-                            height: "100%",
-                            minWidth: 0,
-                            minHeight: 0,
-                            borderRadius: "50%",
-                            color: "white",
-                            backgroundColor: "rgba(0,0,0,0.4)",
+                    <Tooltip title="Open panel" placement="right">
+                        <IconButton
+                            onClick={toggle}
+                            sx={{
+                                width: "100%",
+                                height: "100%",
+                                minWidth: 0,
+                                minHeight: 0,
+                                borderRadius: "50%",
+                                color: "white",
+                                backgroundColor: "rgba(0,0,0,0.4)",
 
-                            "& .MuiSvgIcon-root": {
-                                fontSize: "clamp(70%, 4vw, 90%)",
-                            },
+                                "& .MuiSvgIcon-root": {
+                                    fontSize: "clamp(70%, 4vw, 90%)",
+                                },
 
-                            "&:hover": {
-                                backgroundColor: "rgba(0,0,0,0.6)",
-                            },
-                        }}
-                    >
-                        <MenuIcon />
-                    </IconButton>
+                                "&:hover": {
+                                    backgroundColor: "rgba(0,0,0,0.6)",
+                                },
+                            }}
+                        >
+                            <MenuIcon />
+                        </IconButton>
+                    </Tooltip>
                 </Box>
             </Box>
 
@@ -145,17 +147,19 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                         justifyContent: "flex-end",
                     }}
                 >
-                    <IconButton
-                        onClick={toggle}
-                        sx={{
-                            color: "white",
-                            backgroundColor: "rgba(0,0,0,0.4)",
-                            borderRadius: "50%",
-                            "&:hover": { backgroundColor: "rgba(0,0,0,0.6)" },
-                        }}
-                    >
-                        <ChevronLeft />
-                    </IconButton>
+                    <Tooltip title="Close panel" placement="right">
+                        <IconButton
+                            onClick={toggle}
+                            sx={{
+                                color: "white",
+                                backgroundColor: "rgba(0,0,0,0.4)",
+                                borderRadius: "50%",
+                                "&:hover": { backgroundColor: "rgba(0,0,0,0.6)" },
+                            }}
+                        >
+                            <ChevronLeft />
+                        </IconButton>
+                    </Tooltip>
                 </Box>
 
                 <Box

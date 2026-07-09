@@ -33,8 +33,16 @@ function getFft(size: number): FFT {
     return f;
 }
 
-self.onmessage = (e: MessageEvent<{ busId: string; samples: Float32Array; sampleRate: number }>) => {
-    const { busId, samples, sampleRate } = e.data;
+self.onmessage = (e: MessageEvent<{
+    busId: string;
+    samples: Float32Array;
+    sampleRate: number;
+    sweepStartFreq?: number;
+    sweepEndFreq?: number;
+    sweepDurationSec?: number;
+    sweepStartSec?: number;
+}>) => {
+    const { busId, samples, sampleRate, sweepStartFreq, sweepEndFreq, sweepDurationSec, sweepStartSec } = e.data;
 
     if (!samples || samples.length < 4 || sampleRate <= 0) {
         (self as unknown as Worker).postMessage({ busId, error: "invalid" });
@@ -48,8 +56,13 @@ self.onmessage = (e: MessageEvent<{ busId: string; samples: Float32Array; sample
         return;
     }
 
-    const hop = Math.max(1024, size >> 2);
-    const numFrames = Math.max(1, Math.floor((samples.length - size) / hop) + 1);
+    // Cap STFT memory at ~256 MB (64 M floats). For long recordings, double the hop
+    // until the matrix fits — trades time resolution for memory.
+    const MAX_STFT_FLOATS = 64 * 1024 * 1024;
+    let hop = Math.max(1024, size >> 2);
+    while ((size / 2 + 1) * Math.ceil(samples.length / hop) > MAX_STFT_FLOATS) hop *= 2;
+    // Extend to cover the full signal: last frame may be a zero-padded partial window.
+    const numFrames = Math.max(1, Math.ceil(samples.length / hop));
     const bins = size / 2;
 
     const fft = getFft(size);
@@ -65,7 +78,7 @@ self.onmessage = (e: MessageEvent<{ busId: string; samples: Float32Array; sample
 
     for (let fi = 0; fi < numFrames; fi++) {
         const start = fi * hop;
-        timeBins[fi] = (start + size / 2) / sampleRate;
+        timeBins[fi] = start / sampleRate;
         buffer.fill(0);
         const avail = Math.min(size, samples.length - start);
         if (avail > 0) buffer.set(samples.subarray(start, start + avail));
@@ -109,20 +122,28 @@ self.onmessage = (e: MessageEvent<{ busId: string; samples: Float32Array; sample
     const spikeData = new Float32Array(spikeEntries);
 
     // Fine-resolution bar STFT for smooth bar-chart playback.
-    // frameSize=8192 gives ~5.4 Hz/bin; hop=512 gives ~11.6 ms/frame at 44.1 kHz.
-    // BAR_HZ_W must match BAR_HZ in AudioAnalysisGraph.tsx.
-    const BAR_HZ_W = 10;
-    const rawBarFrame = Math.min(samples.length, 8192);
-    const barFrameSize = 1 << Math.floor(Math.log2(Math.max(4, rawBarFrame)));
+    // BAR_HZ_W controls display bar width (must match BAR_HZ in AudioAnalysisGraph.tsx).
+    // barFrameSize is kept small for temporal responsiveness — fillFrequencyBars handles
+    // upsampling wider FFT bins into display bars without aliasing.
+    const BAR_HZ_W = 5;
+    const barFrameSize = 1 << Math.floor(Math.log2(Math.max(4, Math.min(samples.length, 8192))));
     let barData = new Float32Array(0);
     let barTimeBins = new Float32Array(0);
     let barNumBars = 0;
     let barNumFrames = 0;
 
-    if (samples.length >= barFrameSize) {
-        const BAR_HOP = 512;
-        barNumBars = Math.floor((sampleRate / 2) / BAR_HZ_W);
-        barNumFrames = Math.max(1, Math.floor((samples.length - barFrameSize) / BAR_HOP) + 1);
+    // Cap barData at ~64 MB (16 M floats). Skip entirely if it would exceed the budget
+    // even with the minimum sensible hop — heatmap uses envData, bar chart falls back to live FFT.
+    const MAX_BAR_FLOATS = 16 * 1024 * 1024;
+    const BAR_HOP = 1024;
+    const tentativeBarNumBars = Math.floor((sampleRate / 2) / BAR_HZ_W);
+    const tentativeBarNumFrames = Math.max(1, Math.ceil(samples.length / BAR_HOP));
+    const barFits = samples.length >= barFrameSize &&
+        tentativeBarNumFrames * tentativeBarNumBars <= MAX_BAR_FLOATS;
+
+    if (barFits) {
+        barNumBars = tentativeBarNumBars;
+        barNumFrames = tentativeBarNumFrames;
         barData = new Float32Array(barNumFrames * barNumBars);
         barTimeBins = new Float32Array(barNumFrames);
 
@@ -178,8 +199,150 @@ self.onmessage = (e: MessageEvent<{ busId: string; samples: Float32Array; sample
         envData[fi] = maxAbs;
     }
 
+    // ── Resonance detection ──
+    // Two modes: sweep-based (accurate for speaker-under-plate recordings) and
+    // STFT spectral (fallback for generic recordings without sweep metadata).
+    const resEntries: number[] = [];
+
+    const hasSweep = sweepStartFreq !== undefined && sweepEndFreq !== undefined &&
+        sweepDurationSec !== undefined && sweepDurationSec > 0 && sweepStartFreq !== sweepEndFreq;
+
+    if (hasSweep) {
+        // Map the amplitude envelope to the frequency axis using the linear sweep schedule:
+        //   f(t) = sweepStartFreq + (sweepEndFreq - sweepStartFreq) * (t / sweepDurationSec)
+        // This gives a direct frequency-response curve — peaks = resonances.
+        const sf = sweepStartFreq!;
+        const ef = sweepEndFreq!;
+        const dur = sweepDurationSec!;
+        const freqRange = ef - sf;
+        const freqMin = Math.min(sf, ef);
+        const numFreqBins = Math.round(Math.abs(freqRange)) + 1;
+
+        const offset = sweepStartSec ?? 0;
+        const ampByFreq = new Float32Array(numFreqBins);
+        const peakFiByFreq = new Int32Array(numFreqBins).fill(-1);
+        for (let fi = 0; fi < numEnvFrames; fi++) {
+            const tSweep = envTimeBins[fi] - offset;
+            if (tSweep < 0 || tSweep > dur) continue;
+            const freq = sf + freqRange * (tSweep / dur);
+            const idx = Math.round(freq - freqMin);
+            if (idx >= 0 && idx < numFreqBins && envData[fi] > ampByFreq[idx]) {
+                ampByFreq[idx] = envData[fi];
+                peakFiByFreq[idx] = fi;
+            }
+        }
+
+        // ±5-bin moving average to smooth noise-floor ripple.
+        const SMOOTH_W = 5;
+        const smoothedFreq = new Float32Array(numFreqBins);
+        for (let i = 0; i < numFreqBins; i++) {
+            let s = 0, c = 0;
+            for (let k = Math.max(0, i - SMOOTH_W); k <= Math.min(numFreqBins - 1, i + SMOOTH_W); k++) {
+                s += ampByFreq[k]; c++;
+            }
+            smoothedFreq[i] = c > 0 ? s / c : 0;
+        }
+
+        let globalPeakFreq = 0;
+        for (let i = 0; i < numFreqBins; i++) if (smoothedFreq[i] > globalPeakFreq) globalPeakFreq = smoothedFreq[i];
+        const minPromFreq = globalPeakFreq * 0.05;
+
+        for (let i = 1; i < numFreqBins - 1; i++) {
+            const freq = freqMin + i;
+            if (freq < 20) continue;
+            if (smoothedFreq[i] <= smoothedFreq[i - 1] || smoothedFreq[i] <= smoothedFreq[i + 1]) continue;
+
+            let leftMin = Infinity;
+            for (let k = i - 1; k >= 0; k--) {
+                if (smoothedFreq[k] >= smoothedFreq[i]) break;
+                if (smoothedFreq[k] < leftMin) leftMin = smoothedFreq[k];
+            }
+            let rightMin = Infinity;
+            for (let k = i + 1; k < numFreqBins; k++) {
+                if (smoothedFreq[k] >= smoothedFreq[i]) break;
+                if (smoothedFreq[k] < rightMin) rightMin = smoothedFreq[k];
+            }
+
+            const prom = smoothedFreq[i] - Math.max(
+                isFinite(leftMin) ? leftMin : 0,
+                isFinite(rightMin) ? rightMin : 0,
+            );
+            if (prom < minPromFreq) continue;
+
+            // Seek time = when the sweep was at this frequency (scheduled, not amplitude peak).
+            // Amplitude-peak time is noise-dominated when direct speaker sound is loud.
+            const timeSec = offset + Math.max(0, Math.min(dur, (freq - sf) / freqRange * dur));
+            resEntries.push(freq, smoothedFreq[i], prom, smoothedFreq[i] / globalPeakFreq, timeSec);
+        }
+    } else {
+        // Fallback: prominence-based peak picking on the time-averaged STFT spectrum.
+        const meanSpec = new Float32Array(bins + 1);
+        const stdSpec  = new Float32Array(bins + 1);
+        for (let b = 0; b <= bins; b++) {
+            const off = b * numFrames;
+            let s = 0, s2 = 0;
+            for (let fi = 0; fi < numFrames; fi++) { const v = stftData[off + fi]; s += v; s2 += v * v; }
+            const m = s / numFrames;
+            meanSpec[b] = m;
+            stdSpec[b]  = Math.sqrt(Math.max(0, s2 / numFrames - m * m));
+        }
+
+        const smoothed = new Float32Array(bins + 1);
+        for (let b = 0; b <= bins; b++) {
+            let s = 0, c = 0;
+            for (let k = Math.max(0, b - 3); k <= Math.min(bins, b + 3); k++) { s += meanSpec[k]; c++; }
+            smoothed[b] = s / c;
+        }
+
+        let smoothedPeak = 0;
+        for (let b = 0; b <= bins; b++) if (smoothed[b] > smoothedPeak) smoothedPeak = smoothed[b];
+        const minProm = smoothedPeak * 0.05;
+
+        for (let b = 1; b < bins; b++) {
+            if (frequencies[b] < 20) continue;
+            if (smoothed[b] <= smoothed[b - 1] || smoothed[b] <= smoothed[b + 1]) continue;
+
+            let leftMin = Infinity;
+            for (let i = b - 1; i >= 0; i--) {
+                if (smoothed[i] >= smoothed[b]) break;
+                if (smoothed[i] < leftMin) leftMin = smoothed[i];
+            }
+            let rightMin = Infinity;
+            for (let i = b + 1; i <= bins; i++) {
+                if (smoothed[i] >= smoothed[b]) break;
+                if (smoothed[i] < rightMin) rightMin = smoothed[i];
+            }
+
+            const prom = smoothed[b] - Math.max(isFinite(leftMin) ? leftMin : 0, isFinite(rightMin) ? rightMin : 0);
+            if (prom < minProm) continue;
+
+            const consistency = meanSpec[b] / (1 + stdSpec[b]);
+            let peakFi = 0, peakMag = -1;
+            for (let fi = 0; fi < numFrames; fi++) {
+                const v = stftData[b * numFrames + fi];
+                if (v > peakMag) { peakMag = v; peakFi = fi; }
+            }
+            // Center of the peak frame, not its start edge.
+            const timeSec = timeBins[peakFi] + size / (2 * sampleRate);
+            resEntries.push(frequencies[b], meanSpec[b], prom, consistency, timeSec);
+        }
+    }
+
+    // Sort by prominence desc, keep top 20.  Output: [freq, mag, prominence, consistency, timeSec, ...].
+    const numRes = resEntries.length / 5;
+    const resIdx = Array.from({ length: numRes }, (_, i) => i);
+    resIdx.sort((a, b) => resEntries[b * 5 + 2] - resEntries[a * 5 + 2]);
+    const topN = Math.min(20, numRes);
+    const resonanceData = new Float32Array(topN * 5);
+    for (let i = 0; i < topN; i++) {
+        const s = resIdx[i] * 5, d = i * 5;
+        resonanceData[d] = resEntries[s]; resonanceData[d+1] = resEntries[s+1];
+        resonanceData[d+2] = resEntries[s+2]; resonanceData[d+3] = resEntries[s+3];
+        resonanceData[d+4] = resEntries[s+4];
+    }
+
     (self as unknown as Worker).postMessage(
-        { busId, numFrames, numBins: bins, frameSize: size, hopSize: hop, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames },
-        [timeBins.buffer, frequencies.buffer, stftData.buffer, spikeData.buffer, barData.buffer, barTimeBins.buffer, envData.buffer, envTimeBins.buffer],
+        { busId, numFrames, numBins: bins, frameSize: size, hopSize: hop, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames, resonanceData },
+        [timeBins.buffer, frequencies.buffer, stftData.buffer, spikeData.buffer, barData.buffer, barTimeBins.buffer, envData.buffer, envTimeBins.buffer, resonanceData.buffer],
     );
 };

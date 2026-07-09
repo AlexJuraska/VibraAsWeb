@@ -196,7 +196,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                 <Tooltip title={t("experiments.chladni.components.audioOutputSelector.refresh", "Refresh devices")}>
           <span>
             <IconButton
-                aria-label="refresh devices"
+                aria-label={t("experiments.chladni.components.audioOutputSelector.refresh", "Refresh devices")}
                 onClick={() => { void refreshDevices(); }}
                 disabled={loading}
             >

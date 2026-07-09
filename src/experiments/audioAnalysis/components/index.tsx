@@ -6,3 +6,4 @@ export { default as AudioControlsPanel } from "./AudioControlsPanel";
 export { default as AudioFrequencyGenerator } from "./AudioFrequencyGenerator";
 export { default as AudioPlayer } from "./AudioPlayer";
 export { default as LayoutControlPanel } from "./LayoutControlPanel";
+export { default as ResonantFrequencyList } from "./ResonantFrequencyList";

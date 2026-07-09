@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, ButtonProps } from "@mui/material";
+import { Button, ButtonProps, Tooltip } from "@mui/material";
 
 export type FileExporterProps = {
     getContent: () => string;
@@ -31,15 +31,19 @@ const SavedFreqFileExporter: React.FC<FileExporterProps> = ({
     }, [getContent, fileName]);
 
     return (
-        <Button
-            variant="outlined"
-            color="primary"
-            onClick={handleExport}
-            disabled={disabled}
-            {...buttonProps}
-        >
-            {label}
-        </Button>
+        <Tooltip title="Export saved frequencies to a text file">
+            <span>
+                <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={handleExport}
+                    disabled={disabled}
+                    {...buttonProps}
+                >
+                    {label}
+                </Button>
+            </span>
+        </Tooltip>
     );
 };
 

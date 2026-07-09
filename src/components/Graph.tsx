@@ -138,13 +138,23 @@ const Graph: React.FC<Props> = React.memo(({ data, options, plugins, className, 
 
     const mergedOptions = React.useMemo(() => {
         const base = buildDefaultOptions(theme);
+        const basePlugins = (base.plugins || {}) as Record<string, any>;
+        const optPlugins = ((options && options.plugins) || {}) as Record<string, any>;
         return {
             ...base,
             ...(options || {}),
             plugins: {
-                ...(base.plugins || {}),
-                ...((options && options.plugins) || {})
-            }
+                ...basePlugins,
+                ...optPlugins,
+                tooltip: {
+                    ...basePlugins.tooltip,
+                    ...optPlugins.tooltip,
+                    callbacks: {
+                        ...basePlugins.tooltip?.callbacks,
+                        ...optPlugins.tooltip?.callbacks,
+                    },
+                },
+            },
         } as ChartOptions<"line" | "bar">;
     }, [options, theme]);
 

@@ -13,7 +13,10 @@
   },
   "components": {
     "fileDownloader": "Stiahnuť súbor",
-    "homeButton": "Domov",
+    "homeButton": {
+      "label": "Domov",
+      "tooltip": "Vrátiť sa na domovskú stránku"
+    },
     "languageSelector": "Výber jazyka"
   },
   "experiments": {
@@ -25,10 +28,15 @@
           "browserNotSupported": "Výber výstupného zariadenia nie je v tomto prehliadači podporovaný.",
           "defaultAudio": "Predvolený systémom",
           "audioDevice": "Audio zariadenie",
-          "refresh": "Obnoviť zariadenia"
+          "refresh": "Obnoviť zariadenia",
+          "noDevice": "Žiadne zariadenie"
         },
         "frequencySlider": {
-          "label": "Frekvencia"
+          "label": "Frekvencia",
+          "tooltip": {
+            "decrease": "Znížiť frekvenciu o 1 Hz (podržte pre opakovanie)",
+            "increase": "Zvýšiť frekvenciu o 1 Hz (podržte pre opakovanie)"
+          }
         },
         "gainSlider": {
           "label": "Zosílenie"
@@ -42,7 +50,11 @@
           "noSavedFrequencies": "Nemáte žiadne uložené frekvencie. Môžete pridať viac pomocou tlačidla nižšie alebo importovať súbor s uloženými frekvenciami.",
           "import": "Importovať uložené frekvencie",
           "saveFrequency": "Uložiť aktuálnu frekvenciu",
-          "current": "(aktuálna)"
+          "current": "(aktuálna)",
+          "tooltip": {
+            "save": "Pridať",
+            "saveList": "do zoznamu uložených frekvencií"
+          }
         },
         "startStop": {
           "stop": "Zastaviť zvuk",
@@ -61,7 +73,8 @@
           "mediaDevicesUnavailable": "API pre médiá nie je dostupné.",
           "defaultAudio": "Predvolený systémom",
           "audioDevice": "Audio zariadenie",
-          "refresh": "Obnoviť zariadenia"
+          "refresh": "Obnoviť zariadenia",
+          "noDevice": "Žiadne zariadenie"
         },
         "audioRecorder": {
           "start": "Nahrávať",
@@ -72,25 +85,86 @@
           "startError": "Nedá sa spustiť nahrávanie.",
           "recordingError": "Nahrávanie zlyhalo.",
           "decodeError": "Nahrávku sa nepodarilo dekódovať.",
-          "unsupported": "MediaRecorder nie je v tomto prehliadači podporovaný."
+          "unsupported": "MediaRecorder nie je v tomto prehliadači podporovaný.",
+          "tooltip": {
+            "processing": "Spracovávam nahrávku…",
+            "start": "Nahrávať zvuk z vybraného mikrofónu",
+            "stop": "Zastaviť a uložiť nahrávku"
+          }
         },
         "audioFileUploader": {
           "button": "Nahrať WAV",
           "loading": "Načítava sa…",
           "onlyWav": "Prosím vyberte súbor .wav.",
-          "decodeError": "Audio súbor sa nepodarilo načítať."
+          "decodeError": "Audio súbor sa nepodarilo načítať.",
+          "tooLong": "Súbor je príliš dlhý. Maximálna dĺžka je 30 minút.",
+          "tooltip": {
+            "button": "Načítať WAV súbor na analýzu",
+            "loading": "Dekódujem audio súbor…"
+          }
         },
         "graph": {
           "xAxis": "Čas (s)",
           "yAxis": "Amplitúda",
           "empty": "Nahrajte zvuk pre zobrazenie priebehu.",
-          "dataset": "Záznam"
+          "dataset": "Záznam",
+          "spectrogramTooltip": "Spektrogram — kliknite pre navigáciu",
+          "waveform": "Priebeh",
+          "fft": "FFT",
+          "zoomMode": "Zoom",
+          "cutMode": "Orez",
+          "resetZoom": "Resetovať",
+          "autoTooltip": "Automaticky zobraziť hodnoty",
+          "cancel": "Zrušiť",
+          "confirmCut": "Orezať",
+          "cutConfirmTitle": "Potvrdiť orez",
+          "cutConfirmText": "Zachovať iba vybratý úsek a zahodiť zvyšok?",
+          "fftEmpty": "Nahrajte zvuk pre zobrazenie spektra.",
+          "fftDataset": "FFT",
+          "freqAxis": "Frekvencia (Hz)",
+          "magAxis": "Amplitúda",
+          "scrollZoom": "Posúvať zobrazenie",
+          "tooltip": {
+            "waveform": "Zobraziť zvukový priebeh v čase",
+            "fft": "Zobraziť frekvenčné spektrum (FFT)",
+            "zoomMode": "Potiahnutím priblížiť oblasť",
+            "cutMode": "Potiahnutím vybrať oblasť na orez",
+            "resetZoom": "Resetovať zoom pre zobrazenie celého spektra",
+            "resetZoomTime": "Resetovať zoom pre zobrazenie celej nahrávky",
+            "autoTooltip": "Nepretržite zobrazovať hodnotu amplitúdy na pozícii prehrávania",
+            "scrollLeft": "Posúvať doľava",
+            "scrollRight": "Posúvať doprava"
+          }
         },
         "frequencyGenerator": {
           "title": "Generátor frekvencie",
           "frequency": "Frekvencia",
           "start": "Pustiť zvuk",
-          "stop": "Zastaviť zvuk"
+          "stop": "Zastaviť zvuk",
+          "systemDefault": "Predvolený systémom"
+        },
+        "resonantFrequencyList": {
+          "title": "Rezonančné frekvencie",
+          "play": "Prehrať"
+        },
+        "audioPlayer": {
+          "play": "Prehrať",
+          "pause": "Pozastaviť"
+        },
+        "audioControlsPanel": {
+          "singleLayout": "Jednoduchý režim",
+          "dualLayout": "Dvojgrafový režim (dve nahrávky)",
+          "tooltip": {
+            "single": "Prepnúť na zobrazenie jednej nahrávky",
+            "dual": "Prepnúť na dvojité zobrazenie pre porovnanie dvoch nahrávok vedľa seba"
+          }
+        },
+        "audioRecordingDebug": {
+          "noRecording": "Zatiaľ žiadna nahrávka.",
+          "title": "Informácie o nahrávke",
+          "duration": "Trvanie",
+          "sampleRate": "Vzorkovacia frekvencia",
+          "samples": "Vzorky"
         }
       }
     },
@@ -103,7 +177,13 @@
           "duration": "Doba trvania",
           "start": "Nahrať sweep",
           "stop": "Zastaviť nahrávanie",
-          "invalidRange": "Neplatné nastavenie sweepu."
+          "invalidRange": "Neplatné nastavenie sweepu.",
+          "systemDefault": "Predvolený systémom",
+          "tooltip": {
+            "processing": "Spracovávam nahrávku…",
+            "start": "Prehrať frekvenčný sweep cez reproduktor a zaznamenať odozvu mikrofónu",
+            "stop": "Zastaviť sweep a uložiť nahrávku"
+          }
         }
       }
     }

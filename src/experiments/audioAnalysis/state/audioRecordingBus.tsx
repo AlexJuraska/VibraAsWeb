@@ -3,6 +3,10 @@ export type AudioRecording = {
     sampleRate: number;
     duration: number;
     blob?: Blob;
+    sweepStartFreq?: number;
+    sweepEndFreq?: number;
+    sweepDurationSec?: number;
+    sweepStartSec?: number;
 };
 
 type Listener = (rec: AudioRecording | undefined) => void;

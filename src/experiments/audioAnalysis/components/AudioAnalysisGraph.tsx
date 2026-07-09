@@ -1,5 +1,5 @@
 import React from "react";
-import { Stack, ButtonGroup, Button, Checkbox, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Slider, IconButton, Box } from "@mui/material";
+import { Stack, ButtonGroup, Button, Checkbox, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Slider, IconButton, Box, Tooltip } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { Theme } from "@mui/material/styles";
 import ArrowLeftIcon from "@mui/icons-material/ArrowLeft";
@@ -25,7 +25,7 @@ const MAX_POINTS = 15000;
 const MAX_DISPLAY_SECONDS_FOR_LIVE = 8;
 const LIVE_COARSE_FACTOR = 4;
 const MIN_DRAW_MS_LIVE = 16;
-const BAR_HZ = 10;
+const BAR_HZ = 5;
 
 type ViewMode = "time" | "freq";
 type InteractionMode = "zoom" | "cut";
@@ -358,6 +358,7 @@ const StftHeatmapCanvas: React.FC<{
     paddingLeft?: number;
     paddingRight?: number;
 }> = ({ stftFrame, duration, busId, onSeek, viewStart, viewEnd, cutSelection, paddingLeft = 0, paddingRight = 0 }) => {
+    const { t } = useTranslation();
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     // Pre-rendered full spectrogram; zoomed view is a cheap drawImage crop.
     const offscreenRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -442,22 +443,31 @@ const StftHeatmapCanvas: React.FC<{
     // Uses the 0.001 s amplitude envelope (envData) when available — one pixel per ms,
     // placed at the pixel corresponding to envTimeBins[fi] / duration * canvasWidth.
     React.useEffect(() => {
-        const { stftMatrix, timeBins, frameSize, hopSize, envData, envTimeBins } = stftFrame;
+        const { stftMatrix, timeBins, frameSize, hopSize, envData, envTimeBins, numEnvFrames } = stftFrame;
         const dur = durationRef.current;
 
-        const useEnv = !!envData && !!envTimeBins && envData.length > 0;
-        const frameAmps = useEnv ? envData! : (() => {
-            const maxes = new Float32Array(timeBins.length);
+        let frameAmps: Float32Array;
+        let tBins: Float32Array;
+        let numFrames: number;
+        let canvasWidth: number;
+
+        if (envData && envData.length > 0 && envTimeBins && numEnvFrames) {
+            // Amplitude envelope at ~1 ms resolution — covers full recording with negligible edge gap.
+            numFrames = numEnvFrames;
+            frameAmps = envData;
+            tBins = envTimeBins;
+            canvasWidth = Math.max(1, numFrames);
+        } else {
+            numFrames = timeBins.length;
+            frameAmps = new Float32Array(numFrames);
             for (const arr of stftMatrix.values()) {
-                for (let fi = 0; fi < arr.length; fi++) {
-                    if (arr[fi] > maxes[fi]) maxes[fi] = arr[fi];
+                for (let fi = 0; fi < numFrames; fi++) {
+                    if (arr[fi] > frameAmps[fi]) frameAmps[fi] = arr[fi];
                 }
             }
-            return maxes;
-        })();
-        const tBins = useEnv ? envTimeBins! : timeBins;
-        const numFrames = frameAmps.length;
-        const canvasWidth = Math.max(1, useEnv ? numFrames : numFrames + Math.round(frameSize / hopSize));
+            tBins = timeBins;
+            canvasWidth = Math.max(1, numFrames + Math.round(frameSize / hopSize));
+        }
 
         let gmax = 0;
         for (let i = 0; i < numFrames; i++) {
@@ -533,7 +543,7 @@ const StftHeatmapCanvas: React.FC<{
         <canvas
             ref={canvasRef}
             onClick={handleClick}
-            title="Spectrogram — click to navigate"
+            title={t("experiments.audioAnalysis.components.graph.spectrogramTooltip", "Spectrogram — click to navigate")}
             style={{ width: "100%", height: "100%", display: "block", cursor: "pointer" }}
         />
     );
@@ -930,10 +940,18 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
     }), [autoTooltip, durationSec, onZoomComplete, t, timeYDomain, zoomWindow]);
 
     const freqYMax = React.useMemo(() => {
-        // fftPeak is computed from the full recording at the same FFT size used for live
-        // bar display (DEFAULT_FFT_SIZE), so it is the correct y-axis ceiling.
+        // barData is the actual data driving bar updates during playback — scan it for the true max.
+        if (stftFrame?.barData?.length && stftFrame.barNumBars && stftFrame.barNumFrames) {
+            const { barData } = stftFrame;
+            let peak = 0;
+            for (let i = 0; i < barData.length; i++) {
+                if (barData[i] > peak) peak = barData[i];
+            }
+            return (peak > 0 ? peak : 1) * 1.1;
+        }
+        // Live recording: fftPeak is a sparse scan over the full recording at DEFAULT_FFT_SIZE.
         if (fftPeak && fftPeak > 0) return fftPeak * 1.1;
-        // Fallback when fftPeak is not yet available.
+        // Fallback when neither is available yet.
         if (!freqSource) return 1;
         if ("stftMatrix" in freqSource) {
             let peak = 0;
@@ -948,7 +966,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
             if (freqSource.magnitudes[i] > frameMax) frameMax = freqSource.magnitudes[i];
         }
         return (frameMax > 0 ? frameMax : 1) * 1.1;
-    }, [freqSource, fftPeak]);
+    }, [freqSource, fftPeak, stftFrame]);
 
     const maxFreq = React.useMemo(() => {
         if (stftFrame) {
@@ -1022,6 +1040,7 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
             const yBottom = yScale.bottom as number;
             const yPixelRange = yBottom - (yScale.top as number);
             const parsed = (meta as any)._parsed as Array<{ x: number; y: number }> | undefined;
+            const rawData = chart.data.datasets[0]?.data as Array<{ x: number; y: number }> | undefined;
             const count = Math.min(barCount, meta.data.length);
             for (let bar = 0; bar < count; bar++) {
                 const maxMag = magnitudes[bar];
@@ -1029,13 +1048,20 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                 el.y = yBottom - ((maxMag - yMin) / yRange) * yPixelRange;
                 el.height = yBottom - el.y;
                 if (parsed?.[bar]) parsed[bar].y = maxMag;
+                if (rawData?.[bar]) rawData[bar].y = maxMag;
             }
             chart.draw();
         };
 
         // Post-recording: use fine-hop STFT barData precomputed in the worker.
         // One array lookup + binary search replaces per-frame FFT computation.
-        if (stftFrame?.barData?.length && stftFrame.barNumBars && stftFrame.barNumFrames && stftFrame.barTimeBins?.length) {
+        // Guard: barNumBars must match current BAR_HZ — stale HMR state can leave a frame
+        // computed with a different BAR_HZ_W, causing a frequency-scale mismatch.
+        const expectedBarNumBars = stftFrame?.sampleRate
+            ? Math.floor((stftFrame.sampleRate / 2) / BAR_HZ)
+            : undefined;
+        if (stftFrame?.barData?.length && stftFrame.barNumBars && stftFrame.barNumFrames && stftFrame.barTimeBins?.length
+            && expectedBarNumBars !== undefined && stftFrame.barNumBars === expectedBarNumBars) {
             const { barData, barTimeBins, barNumBars, barNumFrames } = stftFrame;
             return audioPlaybackBus.subscribe((pb) => {
                 const timeSec = pb?.currentTime ?? 0;
@@ -1070,6 +1096,22 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         animation: false,
         plugins: {
             legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: (item) => {
+                        const ticks: Array<{ label: string | string[] }> = (item.chart.scales.y as any).ticks ?? [];
+                        let dp = 0;
+                        for (const tick of ticks) {
+                            const lbl = Array.isArray(tick.label) ? tick.label[0] : tick.label;
+                            if (lbl) {
+                                const dot = lbl.indexOf(".");
+                                if (dot >= 0) dp = Math.max(dp, lbl.length - dot - 1);
+                            }
+                        }
+                        return `${item.dataset.label ?? ""}: ${Number(item.parsed.y).toFixed(dp)}`;
+                    },
+                },
+            },
             zoom: {
                 limits: { x: { min: 0, max: maxFreq, minRange: 20 } },
                 pan: { enabled: false },
@@ -1113,47 +1155,61 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
             {enableToggle && (
                 <ButtonGroup size="small" variant="outlined">
-                    <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setViewState("time")}>
-                        {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
-                    </Button>
-                    <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setViewState("freq")}>
-                        {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
-                    </Button>
+                    <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.waveform", "View audio waveform over time")}>
+                        <Button variant={graphView === "time" ? "contained" : "outlined"} onClick={() => setViewState("time")}>
+                            {t("experiments.audioAnalysis.components.graph.waveform", "Waveform")}
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.fft", "View frequency spectrum (FFT)")}>
+                        <Button variant={graphView === "freq" ? "contained" : "outlined"} onClick={() => setViewState("freq")}>
+                            {t("experiments.audioAnalysis.components.graph.fft", "FFT")}
+                        </Button>
+                    </Tooltip>
                 </ButtonGroup>
             )}
             {graphView === "freq" && !isLiveRecording && (
-                <Button size="small" variant="outlined" onClick={handleResetZoom}>
-                    {t("experiments.audioAnalysis.components.graph.resetZoom", "Reset")}
-                </Button>
+                <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.resetZoom", "Reset zoom to show full spectrum")}>
+                    <Button size="small" variant="outlined" onClick={handleResetZoom}>
+                        {t("experiments.audioAnalysis.components.graph.resetZoom", "Reset")}
+                    </Button>
+                </Tooltip>
             )}
             {graphView === "time" && !isLiveRecording && (
                 <>
                     <ButtonGroup size="small" variant="outlined">
-                        <Button variant={interactionMode === "zoom" ? "contained" : "outlined"} onClick={() => setInteractionMode("zoom")}>
-                            {t("experiments.audioAnalysis.components.graph.zoomMode", "Zoom")}
-                        </Button>
-                        <Button
-                            variant={interactionMode === "cut" ? "contained" : "outlined"}
-                            color={interactionMode === "cut" ? "warning" : "primary"}
-                            onClick={() => setInteractionMode("cut")}
-                        >
-                            {t("experiments.audioAnalysis.components.graph.cutMode", "Cut")}
-                        </Button>
+                        <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.zoomMode", "Drag to zoom in on a region")}>
+                            <Button variant={interactionMode === "zoom" ? "contained" : "outlined"} onClick={() => setInteractionMode("zoom")}>
+                                {t("experiments.audioAnalysis.components.graph.zoomMode", "Zoom")}
+                            </Button>
+                        </Tooltip>
+                        <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.cutMode", "Drag to select a region to cut")}>
+                            <Button
+                                variant={interactionMode === "cut" ? "contained" : "outlined"}
+                                color={interactionMode === "cut" ? "warning" : "primary"}
+                                onClick={() => setInteractionMode("cut")}
+                            >
+                                {t("experiments.audioAnalysis.components.graph.cutMode", "Cut")}
+                            </Button>
+                        </Tooltip>
                     </ButtonGroup>
-                    <Button size="small" variant="outlined" onClick={handleResetZoom}>
-                        {t("experiments.audioAnalysis.components.graph.resetZoom", "Reset")}
-                    </Button>
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                size="small"
-                                checked={autoTooltip}
-                                onChange={(e) => setAutoTooltip(e.target.checked)}
-                            />
-                        }
-                        label={t("experiments.audioAnalysis.components.graph.autoTooltip", "Auto-display values")}
-                        slotProps={{ typography: { variant: "body2" } }}
-                    />
+                    <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.resetZoomTime", "Reset zoom to show full recording")}>
+                        <Button size="small" variant="outlined" onClick={handleResetZoom}>
+                            {t("experiments.audioAnalysis.components.graph.resetZoom", "Reset")}
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.autoTooltip", "Continuously show amplitude value at playhead position")}>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    size="small"
+                                    checked={autoTooltip}
+                                    onChange={(e) => setAutoTooltip(e.target.checked)}
+                                />
+                            }
+                            label={t("experiments.audioAnalysis.components.graph.autoTooltip", "Auto-display values")}
+                            slotProps={{ typography: { variant: "body2" } }}
+                        />
+                    </Tooltip>
                 </>
             )}
         </Stack>
@@ -1164,13 +1220,17 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
             {topControls}
             {graphView === "time" && interactionMode === "zoom" && zoomWindow && !isLiveRecording && (
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 0.5 }}>
-                    <IconButton
-                        size="small"
-                        onClick={() => applyViewportStart(zoomWindow.start - (zoomWindow.end - zoomWindow.start) * 0.1)}
-                        disabled={zoomWindow.start <= zoomWindow.fullMin + 1e-6}
-                    >
-                        <ArrowLeftIcon fontSize="small" />
-                    </IconButton>
+                    <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.scrollLeft", "Scroll left")}>
+                        <span>
+                            <IconButton
+                                size="small"
+                                onClick={() => applyViewportStart(zoomWindow.start - (zoomWindow.end - zoomWindow.start) * 0.1)}
+                                disabled={zoomWindow.start <= zoomWindow.fullMin + 1e-6}
+                            >
+                                <ArrowLeftIcon fontSize="small" />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
                     <Slider
                         value={zoomWindow.start}
                         min={zoomWindow.fullMin}
@@ -1179,13 +1239,17 @@ const AudioAnalysisGraph: React.FC<{ busId?: string; label?: string; mode?: View
                         onChange={(_, value) => applyViewportStart(Array.isArray(value) ? value[0] : value)}
                         aria-label={t("experiments.audioAnalysis.components.graph.scrollZoom", "Scroll zoomed view")}
                     />
-                    <IconButton
-                        size="small"
-                        onClick={() => applyViewportStart(zoomWindow.start + (zoomWindow.end - zoomWindow.start) * 0.1)}
-                        disabled={zoomWindow.end >= zoomWindow.fullMax - 1e-6}
-                    >
-                        <ArrowRightIcon fontSize="small" />
-                    </IconButton>
+                    <Tooltip title={t("experiments.audioAnalysis.components.graph.tooltip.scrollRight", "Scroll right")}>
+                        <span>
+                            <IconButton
+                                size="small"
+                                onClick={() => applyViewportStart(zoomWindow.start + (zoomWindow.end - zoomWindow.start) * 0.1)}
+                                disabled={zoomWindow.end >= zoomWindow.fullMax - 1e-6}
+                            >
+                                <ArrowRightIcon fontSize="small" />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
                 </Stack>
             )}
             {showLiveCanvas ? (

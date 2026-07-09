@@ -15,6 +15,7 @@
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
           { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
           {
             "component": "HomeButton",
@@ -59,7 +60,8 @@
           { "component": "AudioRecordButton", "props": { "busId": "main" } },
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
-          { "component": "AudioPlayer", "props": { "busId": "main" } }
+          { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "main" } }
         ]
       }
     },

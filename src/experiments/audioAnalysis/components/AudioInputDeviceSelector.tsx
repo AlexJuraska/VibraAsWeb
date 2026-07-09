@@ -156,7 +156,7 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
                 <Tooltip title={t("experiments.audioAnalysis.components.audioInputSelector.refresh", "Refresh devices")}>
           <span>
             <IconButton
-                aria-label="refresh devices"
+                aria-label={t("experiments.audioAnalysis.components.audioInputSelector.refresh", "Refresh devices")}
                 onClick={() => { void refreshDevices(); }}
                 disabled={loading}
             >

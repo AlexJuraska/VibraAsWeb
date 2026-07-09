@@ -264,8 +264,10 @@ export const SlideLayout: React.FC<SlideLayoutProps> = ({ config, components }) 
 
                 if (!zone.slideable) {
                     return (
-                        <Box key={name} gridArea={name} sx={{ overflow: "hidden", position: "relative" }}>
-                            <Component {...(zone.props || {})} components={components} />
+                        <Box key={name} gridArea={name} sx={{ position: "relative", minHeight: 0, minWidth: 0 }}>
+                            <Box sx={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+                                <Component {...(zone.props || {})} components={components} />
+                            </Box>
                         </Box>
                     );
                 }

@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, FormControl, InputLabel, MenuItem, Select, Slider, Stack, TextField, InputAdornment, Button, Typography } from "@mui/material";
 import { useTranslation } from "../../../i18n/i18n";
+import { audioFrequencyCommandBus } from "../state/audioFrequencyCommandBus";
 
 const MIN_FREQ = 40;
 const MAX_FREQ = 10000;
@@ -44,7 +45,7 @@ const AudioFrequencyGenerator: React.FC = () => {
                 .filter((d) => d.kind === "audiooutput")
                 .map((d) => ({
                     deviceId: d.deviceId,
-                    label: d.label || (d.deviceId === "default" ? "System default" : `Device …${d.deviceId.slice(-4)}`),
+                    label: d.label || (d.deviceId === "default" ? t("experiments.audioAnalysis.components.frequencyGenerator.systemDefault", "System default") : `Device …${d.deviceId.slice(-4)}`),
                 }));
             if (!outs.some((d) => d.deviceId === "default")) {
                 outs.unshift({ deviceId: "default", label: "System default" });
@@ -58,7 +59,7 @@ const AudioFrequencyGenerator: React.FC = () => {
                     .filter((d) => d.kind === "audiooutput")
                     .map((d) => ({
                         deviceId: d.deviceId,
-                        label: d.label || (d.deviceId === "default" ? "System default" : `Device …${d.deviceId.slice(-4)}`),
+                        label: d.label || (d.deviceId === "default" ? t("experiments.audioAnalysis.components.frequencyGenerator.systemDefault", "System default") : `Device …${d.deviceId.slice(-4)}`),
                     }));
                 if (!outs.some((d) => d.deviceId === "default")) {
                     outs.unshift({ deviceId: "default", label: "System default" });
@@ -136,6 +137,18 @@ const AudioFrequencyGenerator: React.FC = () => {
             try { gain.disconnect(); } catch { /* already disconnected */ }
         });
     }, []);
+
+    // External command: set frequency and start tone (or smoothly retune if already playing).
+    React.useEffect(() => {
+        return audioFrequencyCommandBus.subscribe(({ frequency }) => {
+            const clamped = clampFreq(frequency);
+            freqRef.current = clamped;
+            setFrequency(clamped);
+            setInputValue(String(Math.round(clamped)));
+            scheduleFreq();
+            void startTone(); // no-op if oscillator already running; retune handled by scheduleFreq
+        });
+    }, [scheduleFreq, startTone]);
 
     React.useEffect(() => {
         return () => {

@@ -12,11 +12,13 @@
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
           { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
           { "component": "AutoSweepRecordButton", "props": { "busId": "second" } },
           { "component": "AudioFileUploader", "props": { "busId": "second" } },
           { "component": "DividerLine", "props": {} },
           { "component": "AudioPlayer", "props": { "busId": "second" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "second" } },
           { "component": "DividerLine", "props": {} },
           {
             "component": "HomeButton",
@@ -57,11 +59,13 @@
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
           { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
           { "component": "AutoSweepRecordButton", "props": { "busId": "second" } },
           { "component": "AudioFileUploader", "props": { "busId": "second" } },
           { "component": "DividerLine", "props": {} },
-          { "component": "AudioPlayer", "props": { "busId": "second" } }
+          { "component": "AudioPlayer", "props": { "busId": "second" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "second" } }
         ]
       }
     },

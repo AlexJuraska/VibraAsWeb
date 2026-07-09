@@ -2,8 +2,10 @@ import React from "react";
 import { Box, Divider, Stack, Typography } from "@mui/material";
 import { useAudioRecording } from "../state/audioRecordingBus";
 import AudioPlayer from "./AudioPlayer";
+import { useTranslation } from "../../../i18n/i18n";
 
 const AudioRecordingDebug: React.FC<{ busId?: string }> = ({ busId = "main" }) => {
+    const { t } = useTranslation();
     const recording = useAudioRecording(busId);
     const [url, setUrl] = React.useState<string>("");
 
@@ -21,16 +23,16 @@ const AudioRecordingDebug: React.FC<{ busId?: string }> = ({ busId = "main" }) =
 
 
     if (!recording) {
-        return <Typography variant="body2">No recording yet.</Typography>;
+        return <Typography variant="body2">{t("experiments.audioAnalysis.components.audioRecordingDebug.noRecording", "No recording yet.")}</Typography>;
     }
 
     return (
         <Stack spacing={1}>
-            <Typography variant="subtitle1">Recording info</Typography>
+            <Typography variant="subtitle1">{t("experiments.audioAnalysis.components.audioRecordingDebug.title", "Recording info")}</Typography>
             <Box display="flex" gap={2} flexWrap="wrap">
-                <Typography variant="body2">Duration: {recording.duration.toFixed(2)} s</Typography>
-                <Typography variant="body2">Sample rate: {recording.sampleRate} Hz</Typography>
-                <Typography variant="body2">Samples: {recording.samples.length}</Typography>
+                <Typography variant="body2">{t("experiments.audioAnalysis.components.audioRecordingDebug.duration", "Duration")}: {recording.duration.toFixed(2)} s</Typography>
+                <Typography variant="body2">{t("experiments.audioAnalysis.components.audioRecordingDebug.sampleRate", "Sample rate")}: {recording.sampleRate} Hz</Typography>
+                <Typography variant="body2">{t("experiments.audioAnalysis.components.audioRecordingDebug.samples", "Samples")}: {recording.samples.length}</Typography>
             </Box>
             <Divider />
             {url && <AudioPlayer url={url} busId={busId} />}

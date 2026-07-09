@@ -1,9 +1,10 @@
 import React from "react";
-import { Box, Stack, Button, useTheme } from "@mui/material";
+import { Box, Stack, Button, useTheme, Tooltip } from "@mui/material";
 import type { ComponentMap } from "../../../layout-system/types/ComponentMap";
 import { useLayoutMode } from "../layoutModeContext";
 import { useAudioRecording } from "../state/audioRecordingBus";
 import AudioPlayer from "./AudioPlayer";
+import { useTranslation } from "../../../i18n/i18n";
 
 interface PanelChild {
     component: string;
@@ -21,6 +22,7 @@ const LayoutControlPanel: React.FC<LayoutControlPanelProps> = ({
     children = [],
     busId = "main"
 }) => {
+    const { t } = useTranslation();
     const theme = useTheme();
     const { useDualLayout, toggleLayout } = useLayoutMode();
     const recordingMain = useAudioRecording("main");
@@ -73,6 +75,7 @@ const LayoutControlPanel: React.FC<LayoutControlPanelProps> = ({
         <Box
             sx={{
                 height: "100%",
+                minHeight: 0,
                 display: "flex",
                 flexDirection: "column",
             }}
@@ -80,6 +83,7 @@ const LayoutControlPanel: React.FC<LayoutControlPanelProps> = ({
             <Box
                 sx={{
                     flex: 1,
+                    minHeight: 0,
                     overflowY: "auto",
                     p: theme.spacing(2),
                     display: "flex",
@@ -88,9 +92,15 @@ const LayoutControlPanel: React.FC<LayoutControlPanelProps> = ({
                 }}
             >
                 <Stack direction="row" spacing={1} justifyContent="flex-start" sx={{ flexShrink: 0 }}>
-                    <Button size="small" variant="outlined" onClick={toggleLayout}>
-                        {useDualLayout ? "Single dataset layout" : "Two-graph layout (two recordings)"}
-                    </Button>
+                    <Tooltip title={useDualLayout
+                        ? t("experiments.audioAnalysis.components.audioControlsPanel.tooltip.single", "Switch to single recording view")
+                        : t("experiments.audioAnalysis.components.audioControlsPanel.tooltip.dual", "Switch to dual view for side-by-side A/B comparison of two recordings")}>
+                        <Button size="small" variant="outlined" onClick={toggleLayout}>
+                            {useDualLayout
+                                ? t("experiments.audioAnalysis.components.audioControlsPanel.singleLayout", "Single dataset layout")
+                                : t("experiments.audioAnalysis.components.audioControlsPanel.dualLayout", "Two-graph layout (two recordings)")}
+                        </Button>
+                    </Tooltip>
                 </Stack>
                 {children.map(render)}
             </Box>

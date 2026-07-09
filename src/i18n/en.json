@@ -13,7 +13,10 @@
   },
   "components": {
     "fileDownloader": "Download File",
-    "homeButton": "Home",
+    "homeButton": {
+      "label": "Home",
+      "tooltip": "Return to the home page"
+    },
     "languageSelector": "Select Language"
   },
   "experiments": {
@@ -25,14 +28,19 @@
           "browserNotSupported": "Output device switching is not supported in this browser.",
           "defaultAudio": "System default",
           "audioDevice": "Audio Device",
-          "refresh": "Refresh devices"
+          "refresh": "Refresh devices",
+          "noDevice": "No device"
         },
         "frequencySlider": {
-          "label": "Frequency"
+          "label": "Frequency",
+          "tooltip": {
+            "decrease": "Decrease frequency by 1 Hz (hold to repeat)",
+            "increase": "Increase frequency by 1 Hz (hold to repeat)"
+          }
         },
         "gainSlider": {
           "label": "Gain"
-      },
+        },
         "graph": {
           "xAxis": "Time (s)",
           "yAxis": "Amplitude (a.i.)"
@@ -42,7 +50,11 @@
           "noSavedFrequencies": "You do not have any saved frequencies. You can add more with the button below or import a file with saved frequencies.",
           "import": "Import saved frequencies",
           "saveFrequency": "Save Current Frequency",
-          "current": "(current)"
+          "current": "(current)",
+          "tooltip": {
+            "save": "Add",
+            "saveList": "to saved frequencies list"
+          }
         },
         "startStop": {
           "stop": "Stop Sound",
@@ -61,7 +73,8 @@
           "mediaDevicesUnavailable": "Media devices API not available.",
           "defaultAudio": "System default",
           "audioDevice": "Audio device",
-          "refresh": "Refresh devices"
+          "refresh": "Refresh devices",
+          "noDevice": "No device"
         },
         "audioRecorder": {
           "start": "Record",
@@ -72,27 +85,87 @@
           "startError": "Could not start recording.",
           "recordingError": "Recording failed.",
           "decodeError": "Could not decode the recording.",
-          "unsupported": "MediaRecorder is not supported in this browser."
+          "unsupported": "MediaRecorder is not supported in this browser.",
+          "tooltip": {
+            "processing": "Processing recording…",
+            "start": "Record audio from the selected microphone",
+            "stop": "Stop and save recording"
+          }
         },
         "audioFileUploader": {
           "button": "Upload WAV",
           "loading": "Loading…",
           "onlyWav": "Please select a .wav file.",
-          "decodeError": "Could not read the audio file."
+          "decodeError": "Could not read the audio file.",
+          "tooLong": "File is too long. Maximum duration is 30 minutes.",
+          "tooltip": {
+            "button": "Load a WAV file for analysis",
+            "loading": "Decoding audio file…"
+          }
         },
         "graph": {
           "xAxis": "Time (s)",
           "yAxis": "Amplitude",
           "empty": "Record audio to see the waveform.",
-          "dataset": "Recording"
+          "dataset": "Recording",
+          "spectrogramTooltip": "Spectrogram — click to navigate",
+          "waveform": "Waveform",
+          "fft": "FFT",
+          "zoomMode": "Zoom",
+          "cutMode": "Cut",
+          "resetZoom": "Reset",
+          "autoTooltip": "Auto-display values",
+          "cancel": "Cancel",
+          "confirmCut": "Cut",
+          "cutConfirmTitle": "Confirm cut",
+          "cutConfirmText": "Keep only the selected segment and discard the rest?",
+          "fftEmpty": "Record audio to see the spectrum.",
+          "fftDataset": "FFT",
+          "freqAxis": "Frequency (Hz)",
+          "magAxis": "Amplitude",
+          "scrollZoom": "Scroll zoomed view",
+          "tooltip": {
+            "waveform": "View audio waveform over time",
+            "fft": "View frequency spectrum (FFT)",
+            "zoomMode": "Drag to zoom in on a region",
+            "cutMode": "Drag to select a region to cut",
+            "resetZoom": "Reset zoom to show full spectrum",
+            "resetZoomTime": "Reset zoom to show full recording",
+            "autoTooltip": "Continuously show amplitude value at playhead position",
+            "scrollLeft": "Scroll left",
+            "scrollRight": "Scroll right"
+          }
         },
         "frequencyGenerator": {
           "title": "Frequency Generator",
           "frequency": "Frequency",
           "start": "Start Sound",
-          "stop": "Stop Sound"
+          "stop": "Stop Sound",
+          "systemDefault": "System default"
+        },
+        "resonantFrequencyList": {
+          "title": "Resonant Frequencies",
+          "play": "Play"
+        },
+        "audioPlayer": {
+          "play": "Play",
+          "pause": "Pause"
+        },
+        "audioControlsPanel": {
+          "singleLayout": "Single dataset layout",
+          "dualLayout": "Two-graph layout (two recordings)",
+          "tooltip": {
+            "single": "Switch to single recording view",
+            "dual": "Switch to dual view for side-by-side A/B comparison of two recordings"
+          }
+        },
+        "audioRecordingDebug": {
+          "noRecording": "No recording yet.",
+          "title": "Recording info",
+          "duration": "Duration",
+          "sampleRate": "Sample rate",
+          "samples": "Samples"
         }
-
       }
     },
     "automaticAudioAnalysis": {
@@ -104,7 +177,13 @@
           "duration": "Duration",
           "start": "Record Sweep",
           "stop": "Stop Recording",
-          "invalidRange": "Invalid sweep settings."
+          "invalidRange": "Invalid sweep settings.",
+          "systemDefault": "System default",
+          "tooltip": {
+            "processing": "Processing recording…",
+            "start": "Play a frequency sweep through the speaker and record the microphone response",
+            "stop": "Stop the sweep and save the recording"
+          }
         }
       }
     }

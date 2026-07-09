@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { Button, CircularProgress, Stack, Typography, Tooltip } from "@mui/material";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import StopIcon from "@mui/icons-material/Stop";
 import { useTranslation } from "../../../i18n/i18n";
@@ -212,22 +212,32 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
 
     const isBusy = status === "processing";
 
+    const tooltipTitle = isBusy
+        ? t("experiments.audioAnalysis.components.audioRecorder.tooltip.processing", "Processing recording…")
+        : status === "recording"
+        ? t("experiments.audioAnalysis.components.audioRecorder.tooltip.stop", "Stop and save recording")
+        : t("experiments.audioAnalysis.components.audioRecorder.tooltip.start", "Record audio from the selected microphone");
+
     return (
         <Stack spacing={1} alignItems="flex-start">
-            <Button
-                variant={status === "recording" ? "contained" : "outlined"}
-                color={status === "recording" ? "error" : "primary"}
-                onClick={() => {
-                    if (status === "recording") stopRecording();
-                    else void startRecording();
-                }}
-                startIcon={status === "recording" ? <StopIcon /> : <FiberManualRecordIcon />}
-                disabled={isBusy}
-            >
-                {isBusy ? <CircularProgress size={20} /> : status === "recording"
-                    ? t("experiments.audioAnalysis.components.audioRecorder.stop", "Stop Recording")
-                    : t("experiments.audioAnalysis.components.audioRecorder.start", "Record")}
-            </Button>
+            <Tooltip title={tooltipTitle}>
+                <span>
+                    <Button
+                        variant={status === "recording" ? "contained" : "outlined"}
+                        color={status === "recording" ? "error" : "primary"}
+                        onClick={() => {
+                            if (status === "recording") stopRecording();
+                            else void startRecording();
+                        }}
+                        startIcon={status === "recording" ? <StopIcon /> : <FiberManualRecordIcon />}
+                        disabled={isBusy}
+                    >
+                        {isBusy ? <CircularProgress size={20} /> : status === "recording"
+                            ? t("experiments.audioAnalysis.components.audioRecorder.stop", "Stop Recording")
+                            : t("experiments.audioAnalysis.components.audioRecorder.start", "Record")}
+                    </Button>
+                </span>
+            </Tooltip>
             {error && <Typography variant="body2" color="error">{error}</Typography>}
         </Stack>
     );

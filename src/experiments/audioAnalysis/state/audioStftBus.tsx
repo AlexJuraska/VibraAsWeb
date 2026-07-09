@@ -8,6 +8,14 @@ export type SpikeEntry = {
     magnitude: number;
 };
 
+export type ResonanceEntry = {
+    frequency: number;
+    magnitude: number;
+    prominence: number;
+    consistency: number;
+    timeSec: number;
+};
+
 export type AudioStftFrame = {
     stftMatrix: Map<number, Float32Array>; // freqBinIdx → magnitudes across time
     frequencies: Float32Array;
@@ -26,6 +34,8 @@ export type AudioStftFrame = {
     envData?: Float32Array;
     envTimeBins?: Float32Array;
     numEnvFrames?: number;
+    // Resonant frequencies detected by prominence-based peak picking on the mean spectrum.
+    resonances?: ResonanceEntry[];
 };
 
 type Listener = (frame: AudioStftFrame | undefined) => void;
@@ -208,7 +218,7 @@ function getWorker(): Worker {
     if (worker) return worker;
     worker = new Worker(new URL("./stftWorker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent) => {
-        const { busId, error, numFrames, numBins, frameSize, hopSize, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames } = e.data;
+        const { busId, error, numFrames, numBins, frameSize, hopSize, sampleRate, timeBins, frequencies, stftData, spikeData, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames, resonanceData } = e.data;
         const cb = pendingByBus.get(busId);
         pendingByBus.delete(busId);
         if (!cb) return;
@@ -232,7 +242,19 @@ function getWorker(): Worker {
             entries.push({ timeIdx, timeSec, magnitude });
         }
 
-        cb({ stftMatrix, frequencies, timeBins, spikeMap, frameSize, hopSize, sampleRate, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames });
+        // Reconstruct resonance list from packed [freq, mag, prominence, consistency, timeSec, ...].
+        const resonances: ResonanceEntry[] = [];
+        for (let i = 0; i < (resonanceData as Float32Array).length; i += 5) {
+            resonances.push({
+                frequency:   resonanceData[i],
+                magnitude:   resonanceData[i + 1],
+                prominence:  resonanceData[i + 2],
+                consistency: resonanceData[i + 3],
+                timeSec:     resonanceData[i + 4],
+            });
+        }
+
+        cb({ stftMatrix, frequencies, timeBins, spikeMap, frameSize, hopSize, sampleRate, barData, barTimeBins, barNumBars, barNumFrames, envData, envTimeBins, numEnvFrames, resonances });
     };
     worker.onerror = (e) => {
         console.error("STFT worker error:", e);
@@ -247,7 +269,13 @@ function computeStftAsync(rec: AudioRecording, busId: string) {
     pendingByBus.set(busId, (frame) => publish(frame, busId));
     // Copy samples so the worker can take ownership via transfer (the original stays intact).
     const copy = new Float32Array(rec.samples);
-    getWorker().postMessage({ busId, samples: copy, sampleRate: rec.sampleRate }, [copy.buffer]);
+    getWorker().postMessage({
+        busId, samples: copy, sampleRate: rec.sampleRate,
+        sweepStartFreq: rec.sweepStartFreq,
+        sweepEndFreq: rec.sweepEndFreq,
+        sweepDurationSec: rec.sweepDurationSec,
+        sweepStartSec: rec.sweepStartSec,
+    }, [copy.buffer]);
 }
 
 function ensureSubscription(busId: string) {

@@ -10,6 +10,7 @@ import {
     Select,
     Stack,
     TextField,
+    Tooltip,
     Typography,
 } from "@mui/material";
 import { useTranslation } from "../../../i18n/i18n";
@@ -115,6 +116,10 @@ const AutoSweepRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "
     const lastStepRef = React.useRef<number>(-1);
     const stoppingRef = React.useRef<boolean>(false);
     const sinkIdRef = React.useRef<string>(sinkId);
+    const activeSweepStartFreqRef = React.useRef(DEFAULT_START_FREQ);
+    const activeSweepEndFreqRef = React.useRef(DEFAULT_END_FREQ);
+    const activeSweepDurationRef = React.useRef(DEFAULT_DURATION);
+    const sweepStartSamplesRef = React.useRef<number>(0);
 
     React.useEffect(() => {
         statusRef.current = status;
@@ -131,7 +136,7 @@ const AutoSweepRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "
                 .filter((d) => d.kind === "audiooutput")
                 .map((d) => ({
                     deviceId: d.deviceId,
-                    label: d.label || (d.deviceId === "default" ? "System default" : `Device …${d.deviceId.slice(-4)}`),
+                    label: d.label || (d.deviceId === "default" ? t("experiments.automaticAudioAnalysis.components.autoSweep.systemDefault", "System default") : `Device …${d.deviceId.slice(-4)}`),
                 }));
             if (!outs.some((d) => d.deviceId === "default")) {
                 outs.unshift({ deviceId: "default", label: "System default" });
@@ -145,7 +150,7 @@ const AutoSweepRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "
                     .filter((d) => d.kind === "audiooutput")
                     .map((d) => ({
                         deviceId: d.deviceId,
-                        label: d.label || (d.deviceId === "default" ? "System default" : `Device …${d.deviceId.slice(-4)}`),
+                        label: d.label || (d.deviceId === "default" ? t("experiments.automaticAudioAnalysis.components.autoSweep.systemDefault", "System default") : `Device …${d.deviceId.slice(-4)}`),
                     }));
                 if (!outs.some((d) => d.deviceId === "default")) {
                     outs.unshift({ deviceId: "default", label: "System default" });
@@ -348,7 +353,14 @@ const AutoSweepRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "
             samples.set(samplesView);
             const duration = samples.length / sampleRate;
             const wavBlob = encodeWav(samples, sampleRate);
-            audioRecordingBus.publish({ samples, sampleRate, duration, blob: wavBlob }, busId);
+            const sweepStartSec = sweepStartSamplesRef.current / sampleRate;
+            audioRecordingBus.publish({
+                samples, sampleRate, duration, blob: wavBlob,
+                sweepStartFreq: activeSweepStartFreqRef.current,
+                sweepEndFreq: activeSweepEndFreqRef.current,
+                sweepDurationSec: activeSweepDurationRef.current,
+                sweepStartSec,
+            }, busId);
             onRecordingComplete?.();
         }
 
@@ -377,6 +389,7 @@ const AutoSweepRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "
         const stepDurationMs = (duration * 1000) / totalSteps;
         const direction = end >= start ? 1 : -1;
         lastStepRef.current = -1;
+        sweepStartSamplesRef.current = totalSamplesRef.current;
         sweepStartRef.current = performance.now();
 
         const update = () => {
@@ -421,11 +434,13 @@ const AutoSweepRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "
         const recStarted = await startRecordingInternal();
         if (!recStarted) return;
 
-        const sweepStarted = await startSweepTone(
-            clampFreq(startFreq),
-            clampFreq(endFreq),
-            safeDuration,
-        );
+        const safeStart = clampFreq(startFreq);
+        const safeEnd = clampFreq(endFreq);
+        activeSweepStartFreqRef.current = safeStart;
+        activeSweepEndFreqRef.current = safeEnd;
+        activeSweepDurationRef.current = safeDuration;
+
+        const sweepStarted = await startSweepTone(safeStart, safeEnd, safeDuration);
         if (!sweepStarted) {
             stopRecordingInternal();
         }
@@ -540,19 +555,27 @@ const AutoSweepRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "
                 </Stack>
 
                 <Stack spacing={1} alignItems="flex-start">
-                    <Button
-                        variant={isRecording ? "contained" : "outlined"}
-                        color={isRecording ? "error" : "primary"}
-                        onClick={() => {
-                            if (isRecording) stopAll();
-                            else void startAutoSweep();
-                        }}
-                        disabled={isBusy}
-                    >
-                        {isBusy ? <CircularProgress size={20} /> : isRecording
-                            ? t("experiments.automaticAudioAnalysis.components.autoSweep.stop", "Stop Recording")
-                            : t("experiments.automaticAudioAnalysis.components.autoSweep.start", "Record Sweep")}
-                    </Button>
+                    <Tooltip title={isBusy
+                        ? t("experiments.automaticAudioAnalysis.components.autoSweep.tooltip.processing", "Processing recording…")
+                        : isRecording
+                        ? t("experiments.automaticAudioAnalysis.components.autoSweep.tooltip.stop", "Stop the sweep and save the recording")
+                        : t("experiments.automaticAudioAnalysis.components.autoSweep.tooltip.start", "Play a frequency sweep through the speaker and record the microphone response")}>
+                        <span>
+                            <Button
+                                variant={isRecording ? "contained" : "outlined"}
+                                color={isRecording ? "error" : "primary"}
+                                onClick={() => {
+                                    if (isRecording) stopAll();
+                                    else void startAutoSweep();
+                                }}
+                                disabled={isBusy}
+                            >
+                                {isBusy ? <CircularProgress size={20} /> : isRecording
+                                    ? t("experiments.automaticAudioAnalysis.components.autoSweep.stop", "Stop Recording")
+                                    : t("experiments.automaticAudioAnalysis.components.autoSweep.start", "Record Sweep")}
+                            </Button>
+                        </span>
+                    </Tooltip>
                     {error && <Typography variant="body2" color="error">{error}</Typography>}
                 </Stack>
             </Stack>
