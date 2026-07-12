@@ -145,7 +145,16 @@
         },
         "resonantFrequencyList": {
           "title": "Resonant Frequencies",
-          "play": "Play"
+          "play": "Play",
+          "downloadTitle": "Save Resonant Frequencies",
+          "filenameLabel": "Filename",
+          "download": "Download",
+          "cancel": "Cancel",
+          "tooltipDownload": "Save frequencies to text file",
+          "tooltipUpload": "Load frequencies from text file",
+          "tooltipClear": "Clear uploaded data",
+          "fromFile": "from file",
+          "uploadError": "Invalid file: expected one frequency in Hz per line."
         },
         "audioPlayer": {
           "play": "Play",

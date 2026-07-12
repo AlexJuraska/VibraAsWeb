@@ -81,6 +81,7 @@ function drawLiveWaveform(
     canvas: HTMLCanvasElement,
     samples: Float32Array,
     sampleRate: number,
+    totalDuration: number,
     yBoundsRef: { current: { min: number; max: number } | null },
     topPtsRef: { current: Float64Array | null },
     botPtsRef: { current: Float64Array | null },
@@ -112,11 +113,18 @@ function drawLiveWaveform(
     const maxDisplaySamples = Math.floor(MAX_DISPLAY_SECONDS_FOR_LIVE * sampleRate);
     const startIdx = Math.max(0, samples.length - maxDisplaySamples);
     const displaySamples = samples.subarray(startIdx);
-    const duration = displaySamples.length / sampleRate;
+    const windowDuration = displaySamples.length / sampleRate;
+    const windowStart = Math.max(0, totalDuration - windowDuration);
 
-    // LIVE_COARSE_FACTOR caps total loop iterations to chartW × LIVE_COARSE_FACTOR,
+    // Cap path columns so the polygon never exceeds ~1000 vertices on wide canvases.
+    // Visually a waveform at 500 columns is indistinguishable from one at 1500 columns.
+    const MAX_PATH_COLS = 500;
+    const pathCols = Math.min(chartW, MAX_PATH_COLS);
+    const xScale = chartW / pathCols;
+
+    // LIVE_COARSE_FACTOR caps total loop iterations to pathCols × LIVE_COARSE_FACTOR,
     // keeping per-frame CPU cost constant regardless of how many samples have accumulated.
-    const stride = Math.max(1, Math.ceil(displaySamples.length / (chartW * LIVE_COARSE_FACTOR)));
+    const stride = Math.max(1, Math.ceil(displaySamples.length / (pathCols * LIVE_COARSE_FACTOR)));
 
     let yMin = Infinity;
     let yMax = -Infinity;
@@ -146,7 +154,7 @@ function drawLiveWaveform(
     yMin -= yPad;
     yMax += yPad;
 
-    const toX = (t: number) => chartL + (t / duration) * chartW;
+    const toX = (t: number) => chartL + ((t - windowStart) / windowDuration) * chartW;
     const toY = (v: number) => chartT + (1 - (v - yMin) / (yMax - yMin)) * chartH;
 
     const divider = theme.palette.divider;
@@ -156,69 +164,72 @@ function drawLiveWaveform(
     const tickFont = `12px ${fontFamily}`;
     const labelFont = `12px ${fontFamily}`;
 
-    ctx.lineWidth = 1;
-
     const yTicks = niceTicks(yMin, yMax, Math.max(2, Math.floor(chartH / 40)));
+    const xTicks = niceTicks(windowStart, totalDuration, Math.max(2, Math.floor(chartW / 60)));
+
+    // All grid lines in one path → single GPU draw call instead of ~23 separate strokes.
+    ctx.strokeStyle = divider;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const tick of yTicks) {
+        const py = toY(tick);
+        ctx.moveTo(chartL, py);
+        ctx.lineTo(chartL + chartW, py);
+    }
+    for (const tick of xTicks) {
+        const px = toX(tick);
+        ctx.moveTo(px, chartT);
+        ctx.lineTo(px, chartT + chartH);
+    }
+    ctx.stroke();
+    ctx.strokeRect(chartL, chartT, chartW, chartH);
+
     ctx.font = tickFont;
+    ctx.fillStyle = textSec;
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
     for (const tick of yTicks) {
-        const py = toY(tick);
-        ctx.strokeStyle = divider;
-        ctx.beginPath(); ctx.moveTo(chartL, py); ctx.lineTo(chartL + chartW, py); ctx.stroke();
-        ctx.fillStyle = textSec;
-        ctx.fillText(parseFloat(tick.toFixed(3)).toString(), chartL - 6, py);
+        ctx.fillText(parseFloat(tick.toFixed(3)).toString(), chartL - 6, toY(tick));
     }
-
-    const xTicks = niceTicks(0, duration, Math.max(2, Math.floor(chartW / 60)));
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     for (const tick of xTicks) {
-        const px = toX(tick);
-        ctx.strokeStyle = divider;
-        ctx.beginPath(); ctx.moveTo(px, chartT); ctx.lineTo(px, chartT + chartH); ctx.stroke();
-        ctx.fillStyle = textSec;
-        ctx.fillText(parseFloat(tick.toFixed(2)).toString(), px, chartT + chartH + 4);
+        ctx.fillText(parseFloat(tick.toFixed(2)).toString(), toX(tick), chartT + chartH + 4);
     }
-
-    ctx.strokeStyle = divider;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(chartL, chartT, chartW, chartH);
 
     ctx.save();
     ctx.beginPath();
     ctx.rect(chartL, chartT, chartW, chartH);
     ctx.clip();
 
-    // Reuse pre-allocated pixel buffers; reallocate only when chartW changes.
-    if (!topPtsRef.current || topPtsRef.current.length !== chartW) {
-        topPtsRef.current = new Float64Array(chartW);
+    // Reuse pre-allocated point buffers; reallocate only when pathCols changes.
+    if (!topPtsRef.current || topPtsRef.current.length !== pathCols) {
+        topPtsRef.current = new Float64Array(pathCols);
     }
-    if (!botPtsRef.current || botPtsRef.current.length !== chartW) {
-        botPtsRef.current = new Float64Array(chartW);
+    if (!botPtsRef.current || botPtsRef.current.length !== pathCols) {
+        botPtsRef.current = new Float64Array(pathCols);
     }
     const topPts = topPtsRef.current;
     const botPts = botPtsRef.current;
 
-    // Bucket aggregation: single O(N) pass — each sample lands in exactly one pixel column.
-    topPts.fill(0); // amplitude hi per pixel (starts at 0 = center)
-    botPts.fill(0); // amplitude lo per pixel (starts at 0 = center)
+    // Bucket aggregation into pathCols buckets.
+    topPts.fill(0);
+    botPts.fill(0);
     for (let i = 0; i < displaySamples.length; i += stride) {
-        const px = Math.min(chartW - 1, Math.floor((i / displaySamples.length) * chartW));
+        const px = Math.min(pathCols - 1, Math.floor((i / displaySamples.length) * pathCols));
         const v = displaySamples[i];
         if (v > topPts[px]) topPts[px] = v;
         if (v < botPts[px]) botPts[px] = v;
     }
-    // Convert amplitude values to canvas Y coordinates in place.
-    for (let px = 0; px < chartW; px++) {
+    for (let px = 0; px < pathCols; px++) {
         topPts[px] = toY(topPts[px]);
         botPts[px] = toY(botPts[px]);
     }
 
     ctx.beginPath();
     ctx.moveTo(chartL, topPts[0]);
-    for (let px = 1; px < chartW; px++) ctx.lineTo(chartL + px, topPts[px]);
-    for (let px = chartW - 1; px >= 0; px--) ctx.lineTo(chartL + px, botPts[px]);
+    for (let px = 1; px < pathCols; px++) ctx.lineTo(chartL + px * xScale, topPts[px]);
+    for (let px = pathCols - 1; px >= 0; px--) ctx.lineTo(chartL + px * xScale, botPts[px]);
     ctx.closePath();
     ctx.fillStyle = WAVEFORM_FILL;
     ctx.fill();
@@ -254,7 +265,7 @@ const LiveWaveformCanvas: React.FC<{
     const yBoundsRef = React.useRef<{ min: number; max: number } | null>(null);
     const topPtsRef = React.useRef<Float64Array | null>(null);
     const botPtsRef = React.useRef<Float64Array | null>(null);
-    const pendingRef = React.useRef<{ samples: Float32Array; sampleRate: number } | null>(null);
+    const pendingRef = React.useRef<{ samples: Float32Array; sampleRate: number; totalDuration: number } | null>(null);
     const dirtyRef = React.useRef(false);
     const drawParamsRef = React.useRef({ theme, xLabel, yLabel });
 
@@ -271,7 +282,7 @@ const LiveWaveformCanvas: React.FC<{
 
         const unsub = audioRecordingBus.subscribe((rec) => {
             pendingRef.current = (rec && rec.samples.length > 0 && rec.sampleRate > 0)
-                ? { samples: rec.samples, sampleRate: rec.sampleRate }
+                ? { samples: rec.samples, sampleRate: rec.sampleRate, totalDuration: rec.duration }
                 : null;
             dirtyRef.current = true;
         }, busId);
@@ -287,7 +298,7 @@ const LiveWaveformCanvas: React.FC<{
                     const data = pendingRef.current;
                     if (data) {
                         const { theme: t, xLabel: xl, yLabel: yl } = drawParamsRef.current;
-                        drawLiveWaveform(canvas, data.samples, data.sampleRate, yBoundsRef, topPtsRef, botPtsRef, t, xl, yl);
+                        drawLiveWaveform(canvas, data.samples, data.sampleRate, data.totalDuration, yBoundsRef, topPtsRef, botPtsRef, t, xl, yl);
                     } else {
                         const ctx = canvas.getContext("2d");
                         ctx?.clearRect(0, 0, canvas.width, canvas.height);

@@ -247,6 +247,7 @@ self.onmessage = (e: MessageEvent<{
         for (let i = 0; i < numFreqBins; i++) if (smoothedFreq[i] > globalPeakFreq) globalPeakFreq = smoothedFreq[i];
         const minPromFreq = globalPeakFreq * 0.05;
 
+        const hzPerBin = sampleRate / size;
         for (let i = 1; i < numFreqBins - 1; i++) {
             const freq = freqMin + i;
             if (freq < 20) continue;
@@ -269,10 +270,33 @@ self.onmessage = (e: MessageEvent<{
             );
             if (prom < minPromFreq) continue;
 
+            // Refine frequency using the STFT spectrum at the amplitude-envelope peak time.
+            // The envelope peaks after the sweep has passed the resonance (ring-up delay), so
+            // the sweep-schedule frequency is biased. At peak-amplitude time the structure is
+            // ringing at its natural frequency, so the spectral peak gives the true resonance.
+            const peakFi = peakFiByFreq[i];
+            const peakTimeSec = peakFi >= 0 ? envTimeBins[peakFi] : offset + (freq - sf) / freqRange * dur;
+            const stftFi = Math.max(0, Math.min(numFrames - 1, Math.round(peakTimeSec * sampleRate / hop)));
+            const centerBin = Math.round(freq / hzPerBin);
+            const radius = Math.round(20 / hzPerBin);
+            const bStart = Math.max(1, centerBin - radius);
+            const bEnd = Math.min(bins - 1, centerBin + radius);
+            let maxMag = -1, maxBin = centerBin;
+            for (let b = bStart; b <= bEnd; b++) {
+                const mag = stftData[b * numFrames + stftFi];
+                if (mag > maxMag) { maxMag = mag; maxBin = b; }
+            }
+            // Parabolic interpolation for sub-bin frequency accuracy.
+            let refinedFreq = frequencies[maxBin];
+            const pα = stftData[(maxBin - 1) * numFrames + stftFi];
+            const pβ = stftData[maxBin * numFrames + stftFi];
+            const pγ = stftData[(maxBin + 1) * numFrames + stftFi];
+            const pDenom = pα - 2 * pβ + pγ;
+            if (pDenom < 0) refinedFreq += 0.5 * (pα - pγ) / pDenom * hzPerBin;
+
             // Seek time = when the sweep was at this frequency (scheduled, not amplitude peak).
-            // Amplitude-peak time is noise-dominated when direct speaker sound is loud.
             const timeSec = offset + Math.max(0, Math.min(dur, (freq - sf) / freqRange * dur));
-            resEntries.push(freq, smoothedFreq[i], prom, smoothedFreq[i] / globalPeakFreq, timeSec);
+            resEntries.push(refinedFreq, smoothedFreq[i], prom, smoothedFreq[i] / globalPeakFreq, timeSec);
         }
     } else {
         // Fallback: prominence-based peak picking on the time-averaged STFT spectrum.
@@ -324,18 +348,34 @@ self.onmessage = (e: MessageEvent<{
             }
             // Center of the peak frame, not its start edge.
             const timeSec = timeBins[peakFi] + size / (2 * sampleRate);
-            resEntries.push(frequencies[b], meanSpec[b], prom, consistency, timeSec);
+            // Parabolic interpolation for sub-bin frequency accuracy.
+            const sα = smoothed[b - 1], sβ = smoothed[b], sγ = smoothed[b + 1];
+            const sDenom = sα - 2 * sβ + sγ;
+            const refinedFreq = sDenom < 0
+                ? frequencies[b] + 0.5 * (sα - sγ) / sDenom * (sampleRate / size)
+                : frequencies[b];
+            resEntries.push(refinedFreq, meanSpec[b], prom, consistency, timeSec);
         }
     }
 
-    // Sort by prominence desc, keep top 20.  Output: [freq, mag, prominence, consistency, timeSec, ...].
+    // Sort by prominence desc, suppress peaks within 10 Hz of a stronger one, keep top 10.
+    // Output: [freq, mag, prominence, consistency, timeSec, ...].
     const numRes = resEntries.length / 5;
     const resIdx = Array.from({ length: numRes }, (_, i) => i);
     resIdx.sort((a, b) => resEntries[b * 5 + 2] - resEntries[a * 5 + 2]);
-    const topN = Math.min(20, numRes);
+    const MERGE_HZ = 10;
+    const keptIdx: number[] = [];
+    for (const idx of resIdx) {
+        const freq = resEntries[idx * 5];
+        if (keptIdx.every(k => Math.abs(resEntries[k * 5] - freq) > MERGE_HZ)) {
+            keptIdx.push(idx);
+            if (keptIdx.length >= 10) break;
+        }
+    }
+    const topN = keptIdx.length;
     const resonanceData = new Float32Array(topN * 5);
     for (let i = 0; i < topN; i++) {
-        const s = resIdx[i] * 5, d = i * 5;
+        const s = keptIdx[i] * 5, d = i * 5;
         resonanceData[d] = resEntries[s]; resonanceData[d+1] = resEntries[s+1];
         resonanceData[d+2] = resEntries[s+2]; resonanceData[d+3] = resEntries[s+3];
         resonanceData[d+4] = resEntries[s+4];

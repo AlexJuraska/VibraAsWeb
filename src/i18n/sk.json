@@ -145,7 +145,16 @@
         },
         "resonantFrequencyList": {
           "title": "Rezonančné frekvencie",
-          "play": "Prehrať"
+          "play": "Prehrať",
+          "downloadTitle": "Uložiť rezonančné frekvencie",
+          "filenameLabel": "Názov súboru",
+          "download": "Stiahnuť",
+          "cancel": "Zrušiť",
+          "tooltipDownload": "Uložiť frekvencie do textového súboru",
+          "tooltipUpload": "Načítať frekvencie z textového súboru",
+          "tooltipClear": "Vymazať načítané dáta",
+          "fromFile": "zo súboru",
+          "uploadError": "Neplatný súbor: očakáva sa jedna frekvencia v Hz na riadok."
         },
         "audioPlayer": {
           "play": "Prehrať",

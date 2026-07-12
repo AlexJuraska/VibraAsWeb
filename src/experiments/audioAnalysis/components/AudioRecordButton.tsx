@@ -92,8 +92,8 @@ const AudioRecordButton: React.FC<Props> = ({ onRecordingComplete, busId = "main
         if (total === 0) return;
         const windowSamples = Math.floor(sampleRate * LIVE_WINDOW_SECONDS);
         const start = Math.max(0, total - windowSamples);
-        const samples = accumBufferRef.current.slice(start, total);
-        const duration = samples.length / sampleRate;
+        const samples = accumBufferRef.current.subarray(start, total);
+        const duration = total / sampleRate;  // total elapsed, not window length
         audioRecordingBus.publish({ samples, sampleRate, duration }, busId);
     };
 
