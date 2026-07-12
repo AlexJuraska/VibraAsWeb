@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 const ChladniExp = lazy(() => import("./experiments/chladniPatterns"));
 const LaserExp = lazy(() => import("./experiments/laserVibrometer"));
 const AudioAnalysisExp = lazy(() => import("./experiments/audioAnalysis"));
+const AutomaticAudioAnalysisExp = lazy(() => import("./experiments/automaticAudioAnalysis"));
 const GraphTest = lazy(() => import("./components/graphTest"));
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
                         <Route path="/experiments/chladniPatterns" element={<ChladniExp />} />
                         <Route path="/experiments/laserVibrometer" element={<LaserExp/>} />
                         <Route path="/experiments/audioAnalysis" element={<AudioAnalysisExp/>} />
+                        <Route path="/experiments/automaticAudioAnalysis" element={<AutomaticAudioAnalysisExp/>} />
                         <Route path="/components/graphTest" element={<GraphTest/>} />
                         <Route path="/404" element={<NotFound />} />
                         <Route path="*" element={<Navigate to="/404" />} />

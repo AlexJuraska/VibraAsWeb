@@ -80,7 +80,13 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
             const labelsMissing = list.every((d) => !d.label);
             if (labelsMissing) {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                        },
+                    });
                     stream.getTracks().forEach((t) => t.stop());
                     list = await navigator.mediaDevices.enumerateDevices();
                 } catch {
@@ -146,6 +152,11 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
         }
     };
 
+    const safeSelected = React.useMemo(() => {
+        if (devices.some((d) => d.deviceId === selected)) return selected;
+        return "";
+    }, [devices, selected]);
+
     const disabled = !supportsSetSinkId || loading;
     const disabledReason = !supportsSetSinkId
         ? t("experiments.chladni.components.audioOutputSelector.browserNotSupported",
@@ -164,9 +175,12 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                             labelId="audio-output-label"
                             id="audio-output-select"
                             input={<OutlinedInput label={label} />}
-                            value={selected}
+                            value={safeSelected}
                             onChange={onChange}
                         >
+                            <MenuItem value="">
+                                {t("experiments.chladni.components.audioOutputSelector.noDevice", "No device")}
+                            </MenuItem>
                             {devices.map((d) => (
                                 <MenuItem key={d.deviceId} value={d.deviceId}>
                                     {d.label || (d.deviceId === "default" ?
@@ -182,7 +196,7 @@ export const AudioOutputDeviceSelector: React.FC<Props> = ({
                 <Tooltip title={t("experiments.chladni.components.audioOutputSelector.refresh", "Refresh devices")}>
           <span>
             <IconButton
-                aria-label="refresh devices"
+                aria-label={t("experiments.chladni.components.audioOutputSelector.refresh", "Refresh devices")}
                 onClick={() => { void refreshDevices(); }}
                 disabled={loading}
             >

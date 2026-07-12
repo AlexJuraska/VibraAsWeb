@@ -14,7 +14,8 @@ import {
     AudioOutputDeviceSelector,
     SavedFrequencyDropdown,
 } from "../../experiments/chladniPatterns/components";
-import { AudioFileUploader, AudioInputDeviceSelector, AudioRecordButton, AudioRecordingDebug, AudioRecordingGraph, AudioControlsPanel } from "../../experiments/audioAnalysis/components";
+import { AudioFileUploader, AudioInputDeviceSelector, AudioRecordButton, AudioPlayer, AudioRecordingGraph, AudioControlsPanel, AudioFrequencyGenerator, LayoutControlPanel, ResonantFrequencyList } from "../../experiments/audioAnalysis/components";
+import AutoSweepRecordButton from "../../experiments/automaticAudioAnalysis/components/AutoSweepRecordButton";
 
 export const componentMap = {
     HomeButton,
@@ -32,9 +33,13 @@ export const componentMap = {
     AudioFileUploader,
     AudioInputDeviceSelector,
     AudioRecordButton,
-    AudioRecordingDebug,
+    AudioPlayer,
     AudioRecordingGraph,
     AudioControlsPanel,
+    AudioFrequencyGenerator,
+    LayoutControlPanel,
+    AutoSweepRecordButton,
+    ResonantFrequencyList,
 };
 
 export type ComponentMap = Record<string, React.ComponentType<any>>;

@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { Box, IconButton, Drawer, useTheme } from "@mui/material";
+import { Box, IconButton, Drawer, useTheme, Tooltip } from "@mui/material";
 import { Menu as MenuIcon, ChevronLeft } from "@mui/icons-material";
 import { ComponentMap } from "../layout-system/types/ComponentMap";
+import { useAudioRecording } from "../experiments/audioAnalysis/state/audioRecordingBus";
+import AudioPlayer from "../experiments/audioAnalysis/components/AudioPlayer";
 
 interface PanelChild {
     component: keyof ComponentMap;
@@ -15,12 +17,40 @@ interface CollapsiblePanelProps {
 }
 
 const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
-                                                               collapsed = false,
-                                                               components,
-                                                               children = [],
-                                                           }) => {
+    collapsed = false,
+    components,
+    children = [],
+}) => {
     const [open, setOpen] = useState(!collapsed);
     const theme = useTheme();
+    const recordingMain = useAudioRecording("main");
+    const recordingSecond = useAudioRecording("second");
+    const [urlMain, setUrlMain] = React.useState<string>("");
+    const [urlSecond, setUrlSecond] = React.useState<string>("");
+
+    React.useEffect(() => {
+        if (!recordingMain?.blob) {
+            setUrlMain("");
+            return;
+        }
+        const url = URL.createObjectURL(recordingMain.blob);
+        setUrlMain(url);
+        return () => {
+            URL.revokeObjectURL(url);
+        };
+    }, [recordingMain?.blob]);
+
+    React.useEffect(() => {
+        if (!recordingSecond?.blob) {
+            setUrlSecond("");
+            return;
+        }
+        const url = URL.createObjectURL(recordingSecond.blob);
+        setUrlSecond(url);
+        return () => {
+            URL.revokeObjectURL(url);
+        };
+    }, [recordingSecond?.blob]);
 
     const toggle = () => setOpen((prev) => !prev);
 
@@ -33,6 +63,14 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
     );
 
     const render = (child: PanelChild, i: number) => {
+        if (child.component === "AudioPlayer") {
+            const playerBusId = child.props?.busId || "main";
+            const recording = playerBusId === "main" ? recordingMain : recordingSecond;
+            const playerUrl = playerBusId === "main" ? urlMain : urlSecond;
+
+            return <AudioPlayer key={i} url={playerUrl || null} busId={playerBusId} disabled={!recording || !playerUrl} />;
+        }
+
         const Comp = components[child.component] as React.ComponentType<any>;
         return <Comp key={i} {...child.props} components={components} />;
     };
@@ -57,28 +95,30 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                         boxSizing: "border-box",
                     }}
                 >
-                    <IconButton
-                        onClick={toggle}
-                        sx={{
-                            width: "100%",
-                            height: "100%",
-                            minWidth: 0,
-                            minHeight: 0,
-                            borderRadius: "50%",
-                            color: "white",
-                            backgroundColor: "rgba(0,0,0,0.4)",
+                    <Tooltip title="Open panel" placement="right">
+                        <IconButton
+                            onClick={toggle}
+                            sx={{
+                                width: "100%",
+                                height: "100%",
+                                minWidth: 0,
+                                minHeight: 0,
+                                borderRadius: "50%",
+                                color: "white",
+                                backgroundColor: "rgba(0,0,0,0.4)",
 
-                            "& .MuiSvgIcon-root": {
-                                fontSize: "clamp(70%, 4vw, 90%)",
-                            },
+                                "& .MuiSvgIcon-root": {
+                                    fontSize: "clamp(70%, 4vw, 90%)",
+                                },
 
-                            "&:hover": {
-                                backgroundColor: "rgba(0,0,0,0.6)",
-                            },
-                        }}
-                    >
-                        <MenuIcon />
-                    </IconButton>
+                                "&:hover": {
+                                    backgroundColor: "rgba(0,0,0,0.6)",
+                                },
+                            }}
+                        >
+                            <MenuIcon />
+                        </IconButton>
+                    </Tooltip>
                 </Box>
             </Box>
 
@@ -107,17 +147,19 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
                         justifyContent: "flex-end",
                     }}
                 >
-                    <IconButton
-                        onClick={toggle}
-                        sx={{
-                            color: "white",
-                            backgroundColor: "rgba(0,0,0,0.4)",
-                            borderRadius: "50%",
-                            "&:hover": { backgroundColor: "rgba(0,0,0,0.6)" },
-                        }}
-                    >
-                        <ChevronLeft />
-                    </IconButton>
+                    <Tooltip title="Close panel" placement="right">
+                        <IconButton
+                            onClick={toggle}
+                            sx={{
+                                color: "white",
+                                backgroundColor: "rgba(0,0,0,0.4)",
+                                borderRadius: "50%",
+                                "&:hover": { backgroundColor: "rgba(0,0,0,0.6)" },
+                            }}
+                        >
+                            <ChevronLeft />
+                        </IconButton>
+                    </Tooltip>
                 </Box>
 
                 <Box

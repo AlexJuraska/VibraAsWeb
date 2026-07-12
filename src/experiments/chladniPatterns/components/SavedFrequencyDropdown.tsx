@@ -7,7 +7,7 @@ import {
 } from "../state/savedFrequencies";
 import FileExporter from "../components/SavedFreqFileExporter";
 import SavedFreqFileImporter from "../components/SavedFreqFileImporter";
-import {Box, Button, List, ListItemButton, Paper, Typography} from "@mui/material";
+import {Box, Button, List, ListItemButton, Paper, Tooltip, Typography} from "@mui/material";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
@@ -83,12 +83,14 @@ export default function SavedFrequencyDropdown() {
                         "You do not have any saved frequencies. You can add more with the button below or import a file with saved frequencies.")}
                 </Typography>
 
-                <Button variant="contained"
-                        color="primary"
-                        onClick={addCurrentFrequency}
-                        sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}>
-                    {t("experiments.chladni.components.savedFrequencyDropdown.saveFrequency", "Save Current Frequency")}
-                </Button>
+                <Tooltip title={`${t("experiments.chladni.components.savedFrequencyDropdown.tooltip.save", "Add")} ${currentFreq} Hz ${t("experiments.chladni.components.savedFrequencyDropdown.tooltip.saveList", "to saved frequencies list")}`}>
+                    <Button variant="contained"
+                            color="primary"
+                            onClick={addCurrentFrequency}
+                            sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}>
+                        {t("experiments.chladni.components.savedFrequencyDropdown.saveFrequency", "Save Current Frequency")}
+                    </Button>
+                </Tooltip>
 
                 <SavedFreqFileImporter
                     label={t("experiments.chladni.components.savedFrequencyDropdown.import", "Import saved frequencies")}
@@ -154,15 +156,17 @@ export default function SavedFrequencyDropdown() {
                 </Paper>
             )}
 
-            <Button
-                variant="contained"
-                color="primary"
-                onClick={addCurrentFrequency}
-                fullWidth
-                sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}
-            >
-                {t("experiments.chladni.components.savedFrequencyDropdown.saveFrequency", "Save Current Frequency")}
-            </Button>
+            <Tooltip title={`${t("experiments.chladni.components.savedFrequencyDropdown.tooltip.save", "Add")} ${currentFreq} Hz ${t("experiments.chladni.components.savedFrequencyDropdown.tooltip.saveList", "to saved frequencies list")}`}>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={addCurrentFrequency}
+                    fullWidth
+                    sx={{ flex: 1, textTransform: "none", whiteSpace: "nowrap" }}
+                >
+                    {t("experiments.chladni.components.savedFrequencyDropdown.saveFrequency", "Save Current Frequency")}
+                </Button>
+            </Tooltip>
 
             <Box
                 display="flex"

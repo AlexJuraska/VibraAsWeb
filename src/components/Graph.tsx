@@ -1,35 +1,39 @@
 import React from "react";
-import { Line } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
     ChartOptions
 } from "chart.js";
+import zoomPlugin from "chartjs-plugin-zoom";
 import Box from "@mui/material/Box";
 import { useTheme, alpha } from "@mui/material/styles";
 import type { Theme } from "@mui/material/styles";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, zoomPlugin);
 
 export type Point = { x: number; y: number };
 
 export type Dataset = {
     label: string;
     data: Point[];
-    type?: "line" | "scatter";
+    type?: "line" | "scatter" | "bar";
     stepped?: boolean;
-    pointBackgroundColor?: string;
+    pointBackgroundColor?: string | string[];
     pointRadius?: number;
     showLine?: boolean;
-    backgroundColor?: string;
-    borderColor?: string;
+    backgroundColor?: string | string[];
+    borderColor?: string | string[];
     borderWidth?: number;
+    barPercentage?: number;
+    categoryPercentage?: number;
 };
 
 export type ChartDataProps = {
@@ -38,13 +42,16 @@ export type ChartDataProps = {
 
 type Props = {
     data?: ChartDataProps;
-    options?: ChartOptions<"line">;
+    options?: ChartOptions<"line" | "bar">;
     plugins?: any[];
     className?: string;
     style?: React.CSSProperties;
+    chartType?: "line" | "bar";
+    redrawToken?: number;
+    onChartReady?: (chart: any | null) => void;
 };
 
-const buildDefaultOptions = (theme: Theme): ChartOptions<"line"> => ({
+const buildDefaultOptions = (theme: Theme): ChartOptions<"line" | "bar"> => ({
     responsive: true,
     maintainAspectRatio: false,
     scales: {
@@ -74,8 +81,8 @@ const buildDefaultOptions = (theme: Theme): ChartOptions<"line"> => ({
             font: { family: theme.typography.fontFamily as string }
         },
         tooltip: {
-            titleColor: theme.palette.text.primary,
-            bodyColor: theme.palette.text.secondary
+            titleColor: theme.palette.common.white,
+            bodyColor: theme.palette.common.white
         }
     }
 });
@@ -85,8 +92,17 @@ const isValidChartData = (d: any): d is ChartDataProps => {
     return d.datasets.every((ds: any) => Array.isArray(ds?.data));
 };
 
-const Graph: React.FC<Props> = ({ data, options, plugins, className, style }) => {
+const Graph: React.FC<Props> = React.memo(({ data, options, plugins, className, style, chartType = "line", redrawToken, onChartReady }) => {
     const theme = useTheme<Theme>();
+    const chartRef = React.useRef<any>(null);
+    const onChartReadyRef = React.useRef<typeof onChartReady>(onChartReady);
+    React.useEffect(() => {
+        onChartReadyRef.current = onChartReady;
+    }, [onChartReady]);
+    const setChartRef = React.useCallback((chart: any | null) => {
+        chartRef.current = chart;
+        onChartReadyRef.current?.(chart ?? null);
+    }, []);
 
     const emptyData = React.useMemo<ChartDataProps>(() => ({
         datasets: [
@@ -122,21 +138,46 @@ const Graph: React.FC<Props> = ({ data, options, plugins, className, style }) =>
 
     const mergedOptions = React.useMemo(() => {
         const base = buildDefaultOptions(theme);
+        const basePlugins = (base.plugins || {}) as Record<string, any>;
+        const optPlugins = ((options && options.plugins) || {}) as Record<string, any>;
         return {
             ...base,
             ...(options || {}),
             plugins: {
-                ...(base.plugins || {}),
-                ...((options && options.plugins) || {})
-            }
-        } as ChartOptions<"line">;
+                ...basePlugins,
+                ...optPlugins,
+                tooltip: {
+                    ...basePlugins.tooltip,
+                    ...optPlugins.tooltip,
+                    callbacks: {
+                        ...basePlugins.tooltip?.callbacks,
+                        ...optPlugins.tooltip?.callbacks,
+                    },
+                },
+            },
+        } as ChartOptions<"line" | "bar">;
     }, [options, theme]);
+
+    const ChartComponent = chartType === "bar" ? Bar : Line;
+
+    React.useEffect(() => {
+        if (redrawToken == null) return;
+        const chart = chartRef.current;
+        if (!chart) return;
+        chart.draw();
+    }, [redrawToken]);
+
+    React.useEffect(() => {
+        return () => {
+            onChartReadyRef.current?.(null);
+        };
+    }, []);
 
     return (
         <Box className={className} style={{ height: 360, ...style }}>
-            <Line data={themedData as any} options={mergedOptions as any} plugins={plugins as any} />
+            <ChartComponent ref={setChartRef} data={themedData as any} options={mergedOptions as any} plugins={plugins as any} />
         </Box>
     );
-};
+}) as React.FC<Props>;
 
 export default Graph;

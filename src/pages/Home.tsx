@@ -13,6 +13,7 @@ export default function Home() {
     const experiments = [
             { titleKey: "home.experiment_chladni", title: "Chladni's Patterns", path: "/experiments/chladniPatterns" },
             { titleKey: "home.experiment_audio_analysis", title: "Audio Analysis", path: "/experiments/audioAnalysis" },
+            { titleKey: "home.experiment_automatic_audio_analysis", title: "Automatic Audio Analysis", path: "/experiments/automaticAudioAnalysis" },
     ];
 
     return (

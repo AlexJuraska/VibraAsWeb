@@ -9,20 +9,28 @@
         "children": [
           { "component": "AudioInputDeviceSelector", "props": {} },
           { "component": "DividerLine", "props": {} },
+          { "component": "AudioFrequencyGenerator", "props": {} },
+          { "component": "DividerLine", "props": {} },
           { "component": "AudioRecordButton", "props": { "busId": "main" } },
           { "component": "AudioFileUploader", "props": { "busId": "main" } },
-          { "component": "AudioRecordingDebug", "props": { "busId": "main" } },
           { "component": "DividerLine", "props": {} },
-          { "component": "AudioRecordButton", "props": { "busId": "second" } },
-          { "component": "AudioFileUploader", "props": { "busId": "second" } },
-          { "component": "AudioRecordingDebug", "props": { "busId": "second" } }
+          { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          {
+            "component": "HomeButton",
+            "props": {
+              "to": "/",
+              "color": "primary"
+            }
+          }
         ]
       }
     },
 
     "topGraph": {
       "component": "AudioRecordingGraph",
-      "props": { "busId": "main", "label": "Graph 1" },
+      "props": { "busId": "main", "label": "Waveform", "mode": "time" },
       "slideable": true,
       "slideLabel": "Top Graph",
       "slideDirection": "top",
@@ -32,17 +40,38 @@
 
     "bottomGraph": {
       "component": "AudioRecordingGraph",
-      "props": { "busId": "second", "label": "Graph 2" },
+      "props": { "busId": "main", "label": "FFT", "mode": "freq" },
       "slideable": true,
-      "slideLabel": "Bottom Graph",
+      "slideLabel": "FFT Graph",
       "slideDirection": "bottom",
       "slideGroup": "topBottom",
       "defaultOpen": true
     },
 
     "leftPanel": {
-      "component": "AudioControlsPanel",
-      "props": {}
+      "component": "LayoutControlPanel",
+      "props": {
+        "busId": "main",
+        "children": [
+          { "component": "AudioInputDeviceSelector", "props": {} },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioFrequencyGenerator", "props": {} },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioRecordButton", "props": { "busId": "main" } },
+          { "component": "AudioFileUploader", "props": { "busId": "main" } },
+          { "component": "DividerLine", "props": {} },
+          { "component": "AudioPlayer", "props": { "busId": "main" } },
+          { "component": "ResonantFrequencyList", "props": { "busId": "main" } }
+        ]
+      }
+    },
+
+    "homeButton": {
+      "component": "HomeButton",
+      "props": {
+        "to": "/",
+        "color": "primary"
+      }
     }
   },
 
@@ -61,10 +90,11 @@
     "xl": {
       "areas": [
         ["leftPanel", "topGraph"],
-        ["leftPanel", "bottomGraph"]
+        ["leftPanel", "bottomGraph"],
+        ["homeButton", "bottomGraph"]
       ],
       "columns": ["2fr", "8fr"],
-      "rows": ["1fr", "1fr"]
+      "rows": ["1fr", "1fr", "80px"]
     }
   }
 }

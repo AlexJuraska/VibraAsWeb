@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, ButtonProps } from "@mui/material";
+import { Button, ButtonProps, Tooltip } from "@mui/material";
 import { setSavedFrequencies } from "../state/savedFrequencies";
 
 export type SavedFreqFileImporterProps = {
@@ -62,15 +62,17 @@ const SavedFreqFileImporter: React.FC<SavedFreqFileImporterProps> = ({
                 style={{ display: "none" }}
                 onChange={handleFileChange}
             />
-            <Button
-                variant="outlined"
-                color="primary"
-                onClick={handleClick}
-                sx={{ whiteSpace: "nowrap" }}
-                {...buttonProps}
-            >
-                {label}
-            </Button>
+            <Tooltip title="Import frequencies from a text file">
+                <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={handleClick}
+                    sx={{ whiteSpace: "nowrap" }}
+                    {...buttonProps}
+                >
+                    {label}
+                </Button>
+            </Tooltip>
         </>
     );
 };

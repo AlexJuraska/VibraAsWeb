@@ -1,5 +1,5 @@
 import React from "react";
-import {Box, Slider, Button, TextField, InputAdornment, Typography} from "@mui/material";
+import {Box, Slider, Button, TextField, InputAdornment, Typography, Tooltip} from "@mui/material";
 import type { TextFieldProps } from "@mui/material/TextField";
 import { publishFrequency, subscribeCurrentFrequency } from "../state/currentFrequencyBus";
 import {useTranslation} from "../../../i18n/i18n";
@@ -204,33 +204,37 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
 
             <Box display="flex" alignItems="center" width="100%" gap={1}>
                 {showStepButtons && (
-                    <Button
-                        aria-label="decrease frequency"
-                        variant="outlined"
-                        size="small"
-                        color="primary"
-                        onMouseDown={() => startRepeat(dec)}
-                        onMouseUp={stopRepeat}
-                        onMouseLeave={stopRepeat}
-                        onTouchStart={(e) => { e.preventDefault(); startRepeat(dec); }}
-                        onTouchEnd={stopRepeat}
-                        onClick={(e) => {
-                            if (ignoreNextClickRef.current) {
-                                ignoreNextClickRef.current = false;
-                                return;
-                            }
-                            dec();
-                        }}
-                        disabled={!!disabled || value <= min}
-                        sx={{
-                            p: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                        }}
-                    >
-                        -
-                    </Button>
+                    <Tooltip title={t("experiments.chladni.components.frequencySlider.tooltip.decrease", "Decrease frequency by 1 Hz (hold to repeat)")}>
+                        <span>
+                            <Button
+                                aria-label="decrease frequency"
+                                variant="outlined"
+                                size="small"
+                                color="primary"
+                                onMouseDown={() => startRepeat(dec)}
+                                onMouseUp={stopRepeat}
+                                onMouseLeave={stopRepeat}
+                                onTouchStart={(e) => { e.preventDefault(); startRepeat(dec); }}
+                                onTouchEnd={stopRepeat}
+                                onClick={(e) => {
+                                    if (ignoreNextClickRef.current) {
+                                        ignoreNextClickRef.current = false;
+                                        return;
+                                    }
+                                    dec();
+                                }}
+                                disabled={!!disabled || value <= min}
+                                sx={{
+                                    p: 0,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                }}
+                            >
+                                -
+                            </Button>
+                        </span>
+                    </Tooltip>
                 )}
 
                 <Slider
@@ -248,33 +252,37 @@ const FrequencySlider: React.FC<FrequencySliderProps> = ({
                 />
 
                 {showStepButtons && (
-                    <Button
-                        aria-label="increase frequency"
-                        variant="outlined"
-                        size="small"
-                        color="primary"
-                        onMouseDown={() => startRepeat(inc)}
-                        onMouseUp={stopRepeat}
-                        onMouseLeave={stopRepeat}
-                        onTouchStart={(e) => { e.preventDefault(); startRepeat(inc); }}
-                        onTouchEnd={stopRepeat}
-                        onClick={(e) => {
-                            if (ignoreNextClickRef.current) {
-                                ignoreNextClickRef.current = false;
-                                return;
-                            }
-                            inc();
-                        }}
-                        disabled={!!disabled || value >= max}
-                        sx={{
-                            p: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                        }}
-                    >
-                        +
-                    </Button>
+                    <Tooltip title={t("experiments.chladni.components.frequencySlider.tooltip.increase", "Increase frequency by 1 Hz (hold to repeat)")}>
+                        <span>
+                            <Button
+                                aria-label="increase frequency"
+                                variant="outlined"
+                                size="small"
+                                color="primary"
+                                onMouseDown={() => startRepeat(inc)}
+                                onMouseUp={stopRepeat}
+                                onMouseLeave={stopRepeat}
+                                onTouchStart={(e) => { e.preventDefault(); startRepeat(inc); }}
+                                onTouchEnd={stopRepeat}
+                                onClick={(e) => {
+                                    if (ignoreNextClickRef.current) {
+                                        ignoreNextClickRef.current = false;
+                                        return;
+                                    }
+                                    inc();
+                                }}
+                                disabled={!!disabled || value >= max}
+                                sx={{
+                                    p: 0,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                }}
+                            >
+                                +
+                            </Button>
+                        </span>
+                    </Tooltip>
                 )}
             </Box>
 

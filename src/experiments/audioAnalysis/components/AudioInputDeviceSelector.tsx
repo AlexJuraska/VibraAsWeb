@@ -61,7 +61,13 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
             const labelsMissing = list.every((d) => !d.label);
             if (labelsMissing) {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                        },
+                    });
                     stream.getTracks().forEach((t) => t.stop());
                     list = await navigator.mediaDevices.enumerateDevices();
                 } catch {
@@ -116,6 +122,11 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
         setSelected(deviceId);
     };
 
+    const safeSelected = React.useMemo(() => {
+        if (devices.some((d) => d.deviceId === selected)) return selected;
+        return "";
+    }, [devices, selected]);
+
     return (
         <Box className={className} style={style}>
             <Stack direction="row" spacing={1} alignItems="center">
@@ -125,9 +136,12 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
                         labelId="audio-input-label"
                         id="audio-input-select"
                         input={<OutlinedInput label={resolvedLabel} />}
-                        value={selected}
+                        value={safeSelected}
                         onChange={onChange}
                     >
+                        <MenuItem value="">
+                            {t("experiments.audioAnalysis.components.audioInputSelector.noDevice", "No device")}
+                        </MenuItem>
                         {devices.map((d) => (
                             <MenuItem key={d.deviceId} value={d.deviceId}>
                                 {d.label || (d.deviceId === "default"
@@ -142,7 +156,7 @@ export const AudioInputDeviceSelector: React.FC<Props> = ({
                 <Tooltip title={t("experiments.audioAnalysis.components.audioInputSelector.refresh", "Refresh devices")}>
           <span>
             <IconButton
-                aria-label="refresh devices"
+                aria-label={t("experiments.audioAnalysis.components.audioInputSelector.refresh", "Refresh devices")}
                 onClick={() => { void refreshDevices(); }}
                 disabled={loading}
             >

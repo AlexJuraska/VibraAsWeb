@@ -4,7 +4,6 @@ export type AudioPlayback = {
     playing?: boolean;
 };
 
-// Listener for playback position updates.
 type Listener = (state: AudioPlayback | undefined) => void;
 
 const playbackByBus = new Map<string, AudioPlayback | undefined>();

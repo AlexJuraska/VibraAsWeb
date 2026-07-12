@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, Stack, Typography } from "@mui/material";
+import { Button, Stack, Typography, Tooltip } from "@mui/material";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { useTranslation } from "../../../i18n/i18n";
 import { audioRecordingBus } from "../state/audioRecordingBus";
@@ -24,6 +24,12 @@ const AudioFileUploader: React.FC<{ busId?: string }> = ({ busId = "main" }) => 
             const arrayBuffer = await file.arrayBuffer();
             const audioCtx = new AudioContext();
             const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+
+            if (decoded.duration > 30 * 60) {
+                setError(t("experiments.audioAnalysis.components.audioFileUploader.tooLong", "File is too long. Maximum duration is 30 minutes."));
+                return;
+            }
+
             const channelData = decoded.numberOfChannels > 0 ? decoded.getChannelData(0) : new Float32Array();
             const samples = new Float32Array(channelData.length);
             samples.set(channelData);
@@ -57,16 +63,22 @@ const AudioFileUploader: React.FC<{ busId?: string }> = ({ busId = "main" }) => 
                 style={{ display: "none" }}
                 onChange={onChange}
             />
-            <Button
-                variant="outlined"
-                onClick={() => inputRef.current?.click()}
-                startIcon={<UploadFileIcon />}
-                disabled={loading}
-            >
-                {loading
-                    ? t("experiments.audioAnalysis.components.audioFileUploader.loading", "Loading…")
-                    : t("experiments.audioAnalysis.components.audioFileUploader.button", "Upload WAV")}
-            </Button>
+            <Tooltip title={loading
+                ? t("experiments.audioAnalysis.components.audioFileUploader.tooltip.loading", "Decoding audio file…")
+                : t("experiments.audioAnalysis.components.audioFileUploader.tooltip.button", "Load a WAV file for analysis")}>
+                <span>
+                    <Button
+                        variant="outlined"
+                        onClick={() => inputRef.current?.click()}
+                        startIcon={<UploadFileIcon />}
+                        disabled={loading}
+                    >
+                        {loading
+                            ? t("experiments.audioAnalysis.components.audioFileUploader.loading", "Loading…")
+                            : t("experiments.audioAnalysis.components.audioFileUploader.button", "Upload WAV")}
+                    </Button>
+                </span>
+            </Tooltip>
             {error && <Typography variant="body2" color="error">{error}</Typography>}
         </Stack>
     );

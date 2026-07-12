@@ -3,12 +3,14 @@ export type AudioRecording = {
     sampleRate: number;
     duration: number;
     blob?: Blob;
+    sweepStartFreq?: number;
+    sweepEndFreq?: number;
+    sweepDurationSec?: number;
+    sweepStartSec?: number;
 };
 
-// Listener for recording updates.
 type Listener = (rec: AudioRecording | undefined) => void;
 
-// Track recordings by bus id so multiple graphs can have independent datasets.
 const recordings = new Map<string, AudioRecording | undefined>();
 const listenersByBus = new Map<string, Set<Listener>>();
 
